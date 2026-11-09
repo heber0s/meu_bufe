@@ -4,13 +4,14 @@ import 'package:get/get.dart' hide Value;
 import '../../core/theme/app_theme.dart';
 import '../../data/database/app_database.dart';
 import 'orcamento_detalhe_controller.dart';
+import 'widgets/orcamento_acompanhamento_section.dart';
 
 class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
   const OrcamentoDetalheView({super.key});
 
   Widget _buildFloatingActionButton() {
     return Obx(() {
-      final enabled = !controller.aprovado &&
+      final enabled = controller.podeEditar &&
           !controller.processando.value &&
           !controller.salvando.value;
 
@@ -109,6 +110,11 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
                 if (valor == 'pdf') controller.gerarEEnviarPdf();
                 if (valor == 'confirmar') controller.confirmarOrcamento();
                 if (valor == 'reabrir') controller.reabrirOrcamento();
+                if (valor == 'enviado') controller.marcarComoEnviado();
+                if (valor == 'perdido') controller.marcarComoPerdido();
+                if (valor == 'reabrir_negociacao') {
+                  controller.reabrirParaNegociacao();
+                }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(
@@ -132,7 +138,39 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
                       ],
                     ),
                   )
-                else
+                else if (controller.perdido)
+                  const PopupMenuItem(
+                    value: 'reabrir_negociacao',
+                    child: Row(
+                      children: [
+                        Icon(Icons.restart_alt_rounded),
+                        SizedBox(width: 10),
+                        Text('Reabrir para negociação'),
+                      ],
+                    ),
+                  )
+                else ...[
+                  if (controller.orcamento.value?.status.toLowerCase() != 'enviado')
+                    const PopupMenuItem(
+                      value: 'enviado',
+                      child: Row(
+                        children: [
+                          Icon(Icons.send_outlined, color: AppColors.roseGold),
+                          SizedBox(width: 10),
+                          Text('Marcar como enviado'),
+                        ],
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'perdido',
+                    child: Row(
+                      children: [
+                        Icon(Icons.close_rounded, color: AppColors.terracota),
+                        SizedBox(width: 10),
+                        Text('Marcar como perdido'),
+                      ],
+                    ),
+                  ),
                   const PopupMenuItem(
                     value: 'confirmar',
                     child: Row(
@@ -146,6 +184,7 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
                       ],
                     ),
                   ),
+                ],
               ],
             );
           }),
@@ -195,6 +234,10 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
             children: [
               _buildResumoOrcamento(orcamento),
+              const SizedBox(height: 16),
+              const _HistoricoOrcamentoSection(),
+              const SizedBox(height: 16),
+              OrcamentoAcompanhamentoSection(controller: controller),
               const SizedBox(height: 18),
               _buildSecaoProdutos(),
             ],
@@ -353,6 +396,28 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
               );
             }
 
+            if (controller.perdido) {
+              return SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed:
+                      ocupado ? null : controller.reabrirParaNegociacao,
+                  icon: const Icon(Icons.restart_alt_rounded),
+                  label: const Text('Reabrir para negociação'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.roseGold,
+                    side: BorderSide(
+                      color: AppColors.roseGold.withValues(alpha: 0.55),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                ),
+              );
+            }
+
             return SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -424,7 +489,7 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
             );
           }
 
-          final bloqueado = controller.aprovado;
+          final bloqueado = !controller.podeEditar;
 
           return Column(
             children: [
@@ -760,19 +825,27 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusNormalizado = status.toLowerCase();
     final aprovado = statusNormalizado == 'aprovado';
+    final enviado = statusNormalizado == 'enviado';
+    final perdido = statusNormalizado == 'perdido';
     final recusado = statusNormalizado == 'recusado';
 
     final cor = aprovado
         ? AppColors.sage
-        : recusado
+        : perdido || recusado
             ? AppColors.terracota
-            : AppColors.pessego;
+            : enviado
+                ? AppColors.roseGold
+                : AppColors.pessego;
 
     final texto = aprovado
         ? 'Aprovado'
-        : recusado
-            ? 'Recusado'
-            : 'Pendente';
+        : perdido
+            ? 'Perdido'
+            : recusado
+                ? 'Recusado'
+                : enviado
+                    ? 'Enviado'
+                    : 'Pendente';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -888,3 +961,149 @@ class _EstadoVazio extends StatelessWidget {
     );
   }
 }
+
+class _HistoricoOrcamentoSection extends GetView<OrcamentoDetalheController> {
+  const _HistoricoOrcamentoSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final registros = controller.historico.toList();
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.superficie,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: AppTheme.sombraSutil,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.history_rounded, color: AppColors.roseGold),
+                const SizedBox(width: 9),
+                const Expanded(
+                  child: Text(
+                    'Histórico de alterações',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.texto,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${registros.length}',
+                  style: TextStyle(
+                    color: AppColors.texto.withValues(alpha: 0.55),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (registros.isEmpty)
+              Text(
+                'As alterações e aprovações deste orçamento aparecerão aqui.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: AppColors.texto.withValues(alpha: 0.58),
+                ),
+              )
+            else
+              for (var index = 0; index < registros.length; index++) ...[
+                if (index > 0) const Divider(height: 18),
+                _HistoricoOrcamentoTile(registro: registros[index]),
+              ],
+          ],
+        ),
+      );
+    });
+  }
+}
+
+class _HistoricoOrcamentoTile extends StatelessWidget {
+  const _HistoricoOrcamentoTile({required this.registro});
+
+  final OrcamentoHistorico registro;
+
+  @override
+  Widget build(BuildContext context) {
+    String dois(int valor) => valor.toString().padLeft(2, '0');
+    final data = registro.ocorridoEm;
+    final quando = '${dois(data.day)}/${dois(data.month)}/${data.year} '
+        '${dois(data.hour)}:${dois(data.minute)}';
+    final anterior = registro.valorAnterior?.trim();
+    final novo = registro.valorNovo?.trim();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.champagne.withValues(alpha: 0.65),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(
+            registro.campo == 'Status'
+                ? Icons.verified_outlined
+                : Icons.edit_note_rounded,
+            size: 19,
+            color: AppColors.roseGold,
+          ),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${registro.tipo} · ${registro.campo}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.texto,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '$quando · ${registro.autor}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.texto.withValues(alpha: 0.55),
+                ),
+              ),
+              if ((anterior?.isNotEmpty ?? false) || (novo?.isNotEmpty ?? false)) ...[
+                const SizedBox(height: 6),
+                if (anterior?.isNotEmpty ?? false)
+                  Text(
+                    'Antes: $anterior',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: AppColors.texto.withValues(alpha: 0.62),
+                    ),
+                  ),
+                if (novo?.isNotEmpty ?? false)
+                  Text(
+                    'Depois: $novo',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.texto,
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+

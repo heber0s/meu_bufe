@@ -21,14 +21,27 @@ class FunilVendasView extends GetView<OrcamentosListaController> {
         final pendentes = registros
             .where((r) => r.orcamento.status == 'pendente')
             .toList();
-        final aprovados = registros
-            .where((r) => r.orcamento.status == 'aprovado')
+        final enviados = registros
+            .where((r) => r.orcamento.status.toLowerCase() == 'enviado')
             .toList();
-        final total = pendentes.length + aprovados.length;
+        final aprovados = registros
+            .where((r) => r.orcamento.status.toLowerCase() == 'aprovado')
+            .toList();
+        final perdidos = registros
+            .where((r) =>
+                r.orcamento.status.toLowerCase() == 'perdido' ||
+                r.orcamento.status.toLowerCase() == 'recusado')
+            .toList();
+        final total = pendentes.length + enviados.length +
+            aprovados.length + perdidos.length;
         final taxa = total == 0 ? 0.0 : aprovados.length / total;
         final totalPendente = pendentes.fold<int>(
             0, (soma, resumo) => soma + resumo.totalCentavos);
+        final totalEnviado = enviados.fold<int>(
+            0, (soma, resumo) => soma + resumo.totalCentavos);
         final totalAprovado = aprovados.fold<int>(
+            0, (soma, resumo) => soma + resumo.totalCentavos);
+        final totalPerdido = perdidos.fold<int>(
             0, (soma, resumo) => soma + resumo.totalCentavos);
 
         if (controller.carregando.value) {
@@ -73,6 +86,20 @@ class FunilVendasView extends GetView<OrcamentosListaController> {
             ),
             const SizedBox(height: 12),
             _EtapaFunil(
+              titulo: 'Enviados',
+              descricao: 'Propostas encaminhadas aos clientes.',
+              quantidade: enviados.length,
+              valorCentavos: totalEnviado,
+              proporcao: total == 0 ? 0.0 : enviados.length / total,
+              cor: AppColors.roseGold,
+              icone: Icons.send_rounded,
+              aoTocar: () {
+                controller.definirFiltro('enviado');
+                Get.back();
+              },
+            ),
+            const SizedBox(height: 12),
+            _EtapaFunil(
               titulo: 'Aprovados',
               descricao: 'Eventos confirmados pelos clientes.',
               quantidade: aprovados.length,
@@ -82,6 +109,20 @@ class FunilVendasView extends GetView<OrcamentosListaController> {
               icone: Icons.check_circle_outline_rounded,
               aoTocar: () {
                 controller.definirFiltro('aprovado');
+                Get.back();
+              },
+            ),
+            const SizedBox(height: 12),
+            _EtapaFunil(
+              titulo: 'Perdidos',
+              descricao: 'Orçamentos que não avançaram para aprovação.',
+              quantidade: perdidos.length,
+              valorCentavos: totalPerdido,
+              proporcao: total == 0 ? 0.0 : perdidos.length / total,
+              cor: AppColors.terracota,
+              icone: Icons.close_rounded,
+              aoTocar: () {
+                controller.definirFiltro('perdido');
                 Get.back();
               },
             ),
@@ -97,7 +138,7 @@ class FunilVendasView extends GetView<OrcamentosListaController> {
             ),
             const SizedBox(height: 10),
             Text(
-              'O funil considera os status disponíveis atualmente no app: pendente e aprovado.',
+              'O funil acompanha propostas pendentes, enviadas, aprovadas e perdidas.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
@@ -236,7 +277,7 @@ class _PainelVisaoGeral extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            'Percentual de aprovados entre os pendentes e aprovados.',
+            'Percentual de aprovados entre todos os orçamentos do funil.',
             style: TextStyle(
               fontSize: 11,
               color: AppColors.texto.withValues(alpha: 0.55),

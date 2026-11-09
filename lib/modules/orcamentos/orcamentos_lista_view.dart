@@ -99,8 +99,8 @@ class _Cabecalho extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _CardResumo(
-                      rotulo: 'Em negociação',
-                      valor: controller.totalPendenteCentavos,
+                      rotulo: 'Ativos no funil',
+                      valor: controller.totalEmNegociacaoCentavos,
                       cor: AppColors.pendente,
                     ),
                   ),
@@ -206,7 +206,9 @@ class _Filtros extends StatelessWidget {
   static const _opcoes = {
     'todos': 'Todos',
     'pendente': 'Pendentes',
+    'enviado': 'Enviados',
     'aprovado': 'Aprovados',
+    'perdido': 'Perdidos',
   };
 
   @override

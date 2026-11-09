@@ -35,7 +35,7 @@ class OrcamentosListaController extends GetxController {
 
   final resumos = <OrcamentoResumo>[].obs;
   final carregando = true.obs;
-  final filtro = 'todos'.obs; // todos | pendente | aprovado
+  final filtro = 'todos'.obs; // todos | pendente | enviado | aprovado | perdido
   final busca = ''.obs;
 
   StreamSubscription<List<OrcamentoResumo>>? _sub;
@@ -84,8 +84,10 @@ class OrcamentosListaController extends GetxController {
   List<OrcamentoResumo> get filtrados {
     final termo = busca.value.trim().toLowerCase();
     return resumos.where((r) {
-      final passaStatus =
-          filtro.value == 'todos' || r.orcamento.status == filtro.value;
+      final status = r.orcamento.status.toLowerCase();
+      final passaStatus = filtro.value == 'todos' ||
+          status == filtro.value ||
+          (filtro.value == 'perdido' && status == 'recusado');
       final passaBusca = termo.isEmpty ||
           r.orcamento.titulo.toLowerCase().contains(termo) ||
           r.cliente.nome.toLowerCase().contains(termo);
@@ -95,20 +97,28 @@ class OrcamentosListaController extends GetxController {
 
   int get totalAprovadoCentavos => _somaPorStatus('aprovado');
   int get totalPendenteCentavos => _somaPorStatus('pendente');
+  int get totalEnviadoCentavos => _somaPorStatus('enviado');
+  int get totalPerdidoCentavos => _somaPorStatus('perdido') + _somaPorStatus('recusado');
+  int get totalEmNegociacaoCentavos =>
+      totalPendenteCentavos + totalEnviadoCentavos;
 
-  int get quantidadeAprovados =>
-      resumos.where((r) => r.orcamento.status == 'aprovado').length;
+  int get quantidadeAprovados => _quantidadePorStatus('aprovado');
+  int get quantidadePendentes => _quantidadePorStatus('pendente');
+  int get quantidadeEnviados => _quantidadePorStatus('enviado');
+  int get quantidadePerdidos =>
+      _quantidadePorStatus('perdido') + _quantidadePorStatus('recusado');
 
-  int get quantidadePendentes =>
-      resumos.where((r) => r.orcamento.status == 'pendente').length;
+  int get quantidadeNoFunil => quantidadeAprovados +
+      quantidadePendentes + quantidadeEnviados + quantidadePerdidos;
 
-  /// O funil usa somente os dois estados comerciais atualmente existentes.
-  int get quantidadeNoFunil => quantidadeAprovados + quantidadePendentes;
-
-  /// Participação de aprovados entre orçamentos pendentes e aprovados.
+  /// Percentual de aprovados entre todos os orçamentos do funil.
   double get participacaoAprovados => quantidadeNoFunil == 0
       ? 0.0
       : quantidadeAprovados / quantidadeNoFunil;
+
+  int _quantidadePorStatus(String status) => resumos
+      .where((r) => r.orcamento.status.toLowerCase() == status)
+      .length;
 
   int _somaPorStatus(String status) => resumos
       .where((r) => r.orcamento.status == status)

@@ -4,13 +4,15 @@ import '../theme/app_theme.dart';
 class StatusChip extends StatelessWidget {
   const StatusChip({super.key, required this.status});
 
-  /// 'pendente' | 'aprovado' | 'recusado'
+    /// 'pendente' | 'enviado' | 'aprovado' | 'perdido' | 'recusado'
   final String status;
 
   @override
   Widget build(BuildContext context) {
-    final (fundo, texto, rotulo) = switch (status) {
+    final (fundo, texto, rotulo) = switch (status.toLowerCase()) {
       'aprovado' => (AppColors.aprovado, const Color(0xFF5E7350), 'Aprovado'),
+      'enviado' => (AppColors.roseGold, AppColors.roseGold, 'Enviado'),
+      'perdido' => (AppColors.terracota, AppColors.terracota, 'Perdido'),
       'recusado' => (Colors.grey, const Color(0xFF6B6B6B), 'Recusado'),
       _ => (AppColors.pendente, const Color(0xFFB5694A), 'Pendente'),
     };

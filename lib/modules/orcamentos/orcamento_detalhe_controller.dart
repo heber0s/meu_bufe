@@ -145,13 +145,17 @@ class OrcamentoDetalheController extends GetxController {
   }
 
   bool get aprovado => orcamento.value?.status.toLowerCase() == 'aprovado';
+  bool get perdido => orcamento.value?.status.toLowerCase() == 'perdido';
+  bool get podeEditar => !aprovado && !perdido;
 
   bool _bloqueadoPorAprovacao() {
-    if (!aprovado) return false;
+    if (podeEditar) return false;
 
     Get.snackbar(
-      'Orçamento confirmado',
-      'Reabra o orçamento para fazer alterações.',
+      aprovado ? 'Orçamento confirmado' : 'Orçamento perdido',
+      aprovado
+          ? 'Reabra o orçamento para fazer alterações.'
+          : 'Reabra para negociação antes de alterar os produtos.',
       snackPosition: SnackPosition.BOTTOM,
     );
 
@@ -1078,6 +1082,141 @@ class OrcamentoDetalheController extends GetxController {
       Get.snackbar(
         'Erro',
         'Não foi possível reabrir o orçamento.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      processando.value = false;
+    }
+  }
+
+  Future<void> marcarComoEnviado() => _alterarStatusComercial(
+        novoStatus: 'enviado',
+        tituloDialogo: 'Marcar como enviado?',
+        descricao: 'Registre que o orçamento foi enviado ao cliente.',
+        rotuloAcao: 'Marcar enviado',
+        tipoHistorico: 'Orçamento enviado',
+        mensagemSucesso: 'O orçamento foi marcado como enviado.',
+      );
+
+  Future<void> marcarComoPerdido() => _alterarStatusComercial(
+        novoStatus: 'perdido',
+        tituloDialogo: 'Marcar como perdido?',
+        descricao: 'O orçamento sairá das negociações ativas.',
+        rotuloAcao: 'Marcar perdido',
+        tipoHistorico: 'Orçamento perdido',
+        mensagemSucesso: 'O orçamento foi marcado como perdido.',
+      );
+
+  Future<void> reabrirParaNegociacao() => _alterarStatusComercial(
+        novoStatus: 'pendente',
+        tituloDialogo: 'Reabrir para negociação?',
+        descricao: 'O orçamento voltará para as negociações ativas.',
+        rotuloAcao: 'Reabrir',
+        tipoHistorico: 'Orçamento reaberto para negociação',
+        mensagemSucesso: 'O orçamento voltou para as negociações ativas.',
+      );
+
+  Future<void> _alterarStatusComercial({
+    required String novoStatus,
+    required String tituloDialogo,
+    required String descricao,
+    required String rotuloAcao,
+    required String tipoHistorico,
+    required String mensagemSucesso,
+  }) async {
+    if (processando.value) return;
+
+    final atual = orcamento.value;
+    if (atual == null) {
+      _mostrarMensagemOrcamentoIndisponivel();
+      return;
+    }
+
+    final statusAtual = atual.status.toLowerCase();
+    if (statusAtual == 'aprovado' || statusAtual == novoStatus) return;
+    if (novoStatus == 'enviado' && statusAtual != 'pendente') return;
+    if (novoStatus == 'perdido' &&
+        statusAtual != 'pendente' &&
+        statusAtual != 'enviado') {
+      return;
+    }
+    if (novoStatus == 'pendente' && statusAtual != 'perdido') return;
+
+    final confirmar = await Get.dialog<bool>(
+      AlertDialog(
+        title: Text(tituloDialogo),
+        content: Text(descricao),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Get.back(result: true),
+            child: Text(rotuloAcao),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    processando.value = true;
+    try {
+      await db.transaction(() async {
+        await (db.update(db.orcamentos)
+              ..where((orcamento) => orcamento.id.equals(atual.id)))
+            .write(OrcamentosCompanion(status: Value(novoStatus)));
+
+        await db.customStatement(
+          '''
+          INSERT INTO orcamento_historico
+            (orcamento_id, ocorrido_em, tipo, campo, valor_anterior,
+             valor_novo, autor)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            atual.id,
+            DateTime.now().millisecondsSinceEpoch,
+            tipoHistorico,
+            'Status',
+            atual.status,
+            novoStatus,
+            'Usuário local',
+          ],
+        );
+
+        if (novoStatus == 'perdido') {
+          await (db.delete(db.eventos)
+                ..where((evento) => evento.orcamentoId.equals(atual.id)))
+              .go();
+        }
+      });
+
+      await carregarOrcamento();
+      if (novoStatus == 'perdido' &&
+          Get.isRegistered<NotificacaoService>()) {
+        try {
+          await Get.find<NotificacaoService>().cancelarRetorno(atual.id);
+        } catch (_) {
+          Get.snackbar(
+            'Status atualizado',
+            'O orçamento foi marcado como perdido, mas o lembrete local não foi cancelado.',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+          return;
+        }
+      }
+
+      Get.snackbar(
+        'Status atualizado',
+        mensagemSucesso,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Erro',
+        'Não foi possível atualizar o status do orçamento.',
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
