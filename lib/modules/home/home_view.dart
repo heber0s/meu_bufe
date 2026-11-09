@@ -145,6 +145,12 @@ class _MenuRecursosSheet extends StatelessWidget {
           icone: Icons.filter_alt_outlined,
           rota: Routes.funilVendas,
         ),
+        _RecursoHome(
+          titulo: 'Central de Retornos',
+          descricao: 'Acompanhe retornos atrasados e próximos',
+          icone: Icons.notifications_active_outlined,
+          rota: Routes.retornos,
+        ),
       ],
     ),
     _GrupoRecursos(
