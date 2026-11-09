@@ -196,7 +196,7 @@ class NotificacaoService extends GetxService {
       JOIN orcamentos o ON o.id = atual.orcamento_id
       JOIN clientes c ON c.id = o.cliente_id
       WHERE atual.proximo_retorno IS NOT NULL
-        AND LOWER(o.status) != 'aprovado'
+        AND LOWER(TRIM(o.status)) NOT IN ('aprovado', 'perdido')
     ''').get();
 
     for (final linha in linhas) {

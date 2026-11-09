@@ -18,6 +18,8 @@ import '../modules/orcamentos/orcamento_form_view.dart';
 import '../modules/orcamentos/funil_vendas_view.dart';
 import '../modules/relatorios/relatorios_binding.dart';
 import '../modules/relatorios/relatorios_view.dart';
+import '../modules/retornos/retornos_binding.dart';
+import '../modules/retornos/retornos_view.dart';
 import '../modules/receitas/receitas_binding.dart';
 import '../modules/receitas/receitas_view.dart';
 import '../modules/servicos/servicos_binding.dart';
@@ -62,6 +64,13 @@ abstract class AppPages {
       name: Routes.relatorios,
       page: () => const RelatoriosView(),
       binding: RelatoriosBinding(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _duracao,
+    ),
+    GetPage(
+      name: Routes.retornos,
+      page: () => const RetornosView(),
+      binding: RetornosBinding(),
       transition: Transition.rightToLeftWithFade,
       transitionDuration: _duracao,
     ),

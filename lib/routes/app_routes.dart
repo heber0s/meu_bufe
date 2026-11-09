@@ -13,6 +13,7 @@ abstract class Routes {
   static const catalogo = '/catalogo';
   static const funilVendas = '/funil-vendas';
   static const relatorios = '/relatorios';
+  static const retornos = '/retornos';
 
   static String detalhe(int id) => '/orcamentos/$id';
   static String clienteDetalhe(int id) => '/clientes/$id';
