@@ -215,6 +215,24 @@ class AppDatabase extends _$AppDatabase {
             CREATE INDEX IF NOT EXISTS evento_checklist_evento_idx
             ON evento_checklist_itens (evento_id, concluida, ordem, id)
           ''');
+          await customStatement('''
+            CREATE TABLE IF NOT EXISTS orcamento_historico (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              orcamento_id INTEGER NOT NULL,
+              ocorrido_em INTEGER NOT NULL,
+              tipo TEXT NOT NULL,
+              campo TEXT NOT NULL,
+              valor_anterior TEXT,
+              valor_novo TEXT,
+              autor TEXT NOT NULL DEFAULT 'Usuário local',
+              FOREIGN KEY (orcamento_id) REFERENCES orcamentos(id)
+                ON DELETE CASCADE
+            )
+          ''');
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS orcamento_historico_orcamento_idx
+            ON orcamento_historico (orcamento_id, ocorrido_em DESC, id DESC)
+          ''');
         },
       );
 }

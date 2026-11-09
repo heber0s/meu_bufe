@@ -45,6 +45,40 @@ class OrcamentoAcompanhamento {
   }
 }
 
+class OrcamentoHistorico {
+  const OrcamentoHistorico({
+    required this.id,
+    required this.ocorridoEm,
+    required this.tipo,
+    required this.campo,
+    required this.valorAnterior,
+    required this.valorNovo,
+    required this.autor,
+  });
+
+  final int id;
+  final DateTime ocorridoEm;
+  final String tipo;
+  final String campo;
+  final String? valorAnterior;
+  final String? valorNovo;
+  final String autor;
+
+  factory OrcamentoHistorico.fromRow(QueryRow row) {
+    return OrcamentoHistorico(
+      id: row.read<int>('id'),
+      ocorridoEm: DateTime.fromMillisecondsSinceEpoch(
+        row.read<int>('ocorrido_em'),
+      ),
+      tipo: row.read<String>('tipo'),
+      campo: row.read<String>('campo'),
+      valorAnterior: row.read<String?>('valor_anterior'),
+      valorNovo: row.read<String?>('valor_novo'),
+      autor: row.read<String>('autor'),
+    );
+  }
+}
+
 class OrcamentoDetalheController extends GetxController {
   OrcamentoDetalheController({
     AppDatabase? database,
@@ -58,6 +92,7 @@ class OrcamentoDetalheController extends GetxController {
   final itens = <OrcamentoIten>[].obs;
   final receitas = <Receita>[].obs;
   final acompanhamentos = <OrcamentoAcompanhamento>[].obs;
+  final historico = <OrcamentoHistorico>[].obs;
   final carregando = false.obs;
   final processando = false.obs;
   final salvando = false.obs;
@@ -168,6 +203,7 @@ class OrcamentoDetalheController extends GetxController {
 
       _observarItens();
       await carregarAcompanhamentos();
+      await carregarHistorico();
     } catch (_) {
       erro.value = 'Não foi possível carregar o orçamento.';
       Get.snackbar(
@@ -193,6 +229,64 @@ class OrcamentoDetalheController extends GetxController {
     acompanhamentos.assignAll(
       linhas.map(OrcamentoAcompanhamento.fromRow),
     );
+  }
+
+  Future<void> carregarHistorico() async {
+    final linhas = await db.customSelect(
+      '''
+      SELECT id, ocorrido_em, tipo, campo, valor_anterior, valor_novo, autor
+      FROM orcamento_historico
+      WHERE orcamento_id = ?
+      ORDER BY ocorrido_em DESC, id DESC
+      ''',
+      variables: [Variable.withInt(orcamentoId)],
+    ).get();
+    historico.assignAll(linhas.map(OrcamentoHistorico.fromRow));
+  }
+
+  Future<void> _registrarHistorico({
+    required String tipo,
+    required String campo,
+    String? anterior,
+    String? novo,
+  }) async {
+    await db.customStatement(
+      '''
+      INSERT INTO orcamento_historico
+        (orcamento_id, ocorrido_em, tipo, campo, valor_anterior, valor_novo, autor)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ''',
+      [
+        orcamentoId,
+        DateTime.now().millisecondsSinceEpoch,
+        tipo,
+        campo,
+        anterior,
+        novo,
+        'Usuário local',
+      ],
+    );
+    await carregarHistorico();
+  }
+
+  String _resumoItem(ItemOrcamento item) {
+    return '${item.nome} · qtd. ${item.quantidade} · '
+        '${formatarCentavos(item.precoCentavos)} · ${item.tipoCobranca}';
+  }
+
+  String _resumoItemBanco(OrcamentoIten item) {
+    return '${item.nome} · qtd. ${item.quantidade} · '
+        '${formatarCentavos(item.precoCentavos)} · ${item.tipoCobranca}';
+  }
+
+  Future<String> _resumoItensBanco() async {
+    final registros = await (db.select(db.orcamentoItens)
+          ..where((item) => item.orcamentoId.equals(orcamentoId))
+          ..orderBy([(item) => OrderingTerm.asc(item.id)]))
+        .get();
+    return registros.isEmpty
+        ? 'Nenhum item'
+        : registros.map(_resumoItemBanco).join('\n');
   }
 
   Future<void> registrarAcompanhamento({
@@ -404,6 +498,12 @@ class OrcamentoDetalheController extends GetxController {
             ),
           );
 
+      await _registrarHistorico(
+        tipo: 'Item adicionado',
+        campo: 'Itens e valores',
+        novo: _resumoItem(item),
+      );
+
       Get.snackbar(
         'Item adicionado',
         'O item foi incluído no orçamento.',
@@ -536,10 +636,19 @@ class OrcamentoDetalheController extends GetxController {
     processando.value = true;
 
     try {
+      final itensAntes = await _resumoItensBanco();
       await receitaOrcamentoService.adicionarReceitaAoOrcamento(
         orcamentoId: atual.id,
         convidados: atual.convidados,
         receitaId: receitaId,
+      );
+
+      final itensDepois = await _resumoItensBanco();
+      await _registrarHistorico(
+        tipo: 'Receita adicionada',
+        campo: 'Itens e valores',
+        anterior: itensAntes,
+        novo: itensDepois,
       );
 
       Get.snackbar(
@@ -595,6 +704,9 @@ class OrcamentoDetalheController extends GetxController {
     processando.value = true;
 
     try {
+      final anterior = await (db.select(db.orcamentoItens)
+            ..where((registro) => registro.id.equals(itemId)))
+          .getSingleOrNull();
       await (db.update(db.orcamentoItens)
             ..where((registro) => registro.id.equals(itemId)))
           .write(
@@ -612,6 +724,15 @@ class OrcamentoDetalheController extends GetxController {
           servicoId: Value(item.servicoId),
         ),
       );
+
+      if (anterior != null) {
+        await _registrarHistorico(
+          tipo: 'Item alterado',
+          campo: 'Itens e valores',
+          anterior: _resumoItemBanco(anterior),
+          novo: _resumoItem(item),
+        );
+      }
 
       Get.snackbar(
         'Item atualizado',
@@ -644,9 +765,21 @@ class OrcamentoDetalheController extends GetxController {
     processando.value = true;
 
     try {
+      final anterior = await (db.select(db.orcamentoItens)
+            ..where((item) => item.id.equals(itemId)))
+          .getSingleOrNull();
       await (db.delete(db.orcamentoItens)
             ..where((item) => item.id.equals(itemId)))
           .go();
+
+      if (anterior != null) {
+        await _registrarHistorico(
+          tipo: 'Item removido',
+          campo: 'Itens e valores',
+          anterior: _resumoItemBanco(anterior),
+          novo: null,
+        );
+      }
 
       Get.snackbar(
         'Produto removido',
@@ -670,9 +803,18 @@ class OrcamentoDetalheController extends GetxController {
     processando.value = true;
 
     try {
+      final itensAntes = await _resumoItensBanco();
       await receitaOrcamentoService.removerReceitaDoOrcamento(
         orcamentoId: orcamentoId,
         receitaId: receitaId,
+      );
+
+      final itensDepois = await _resumoItensBanco();
+      await _registrarHistorico(
+        tipo: 'Receita removida',
+        campo: 'Itens e valores',
+        anterior: itensAntes,
+        novo: itensDepois,
       );
 
       Get.snackbar(
@@ -788,6 +930,23 @@ class OrcamentoDetalheController extends GetxController {
             status: Value('aprovado'),
           ),
         );
+        await db.customStatement(
+          '''
+          INSERT INTO orcamento_historico
+            (orcamento_id, ocorrido_em, tipo, campo, valor_anterior,
+             valor_novo, autor)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            atual.id,
+            DateTime.now().millisecondsSinceEpoch,
+            'Orçamento aprovado',
+            'Status',
+            atual.status,
+            'aprovado',
+            'Usuário local',
+          ],
+        );
 
         final eventoExistente = await (db.select(db.eventos)
               ..where((evento) => evento.orcamentoId.equals(atual.id))
@@ -884,6 +1043,23 @@ class OrcamentoDetalheController extends GetxController {
           const OrcamentosCompanion(
             status: Value('pendente'),
           ),
+        );
+        await db.customStatement(
+          '''
+          INSERT INTO orcamento_historico
+            (orcamento_id, ocorrido_em, tipo, campo, valor_anterior,
+             valor_novo, autor)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            atual.id,
+            DateTime.now().millisecondsSinceEpoch,
+            'Orçamento reaberto',
+            'Status',
+            atual.status,
+            'pendente',
+            'Usuário local',
+          ],
         );
 
         await (db.delete(db.eventos)

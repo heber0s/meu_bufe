@@ -385,7 +385,6 @@ class OrcamentoController extends GetxController {
     }
 
     final titulo = tituloCtrl.text.trim();
-
     final mensagemErro = titulo.isEmpty
         ? 'Dê um nome ao evento.'
         : cliente.value == null
@@ -410,15 +409,68 @@ class OrcamentoController extends GetxController {
     try {
       final local = localCtrl.text.trim();
       final observacoes = obsCtrl.text.trim();
+      final mudancas = <_MudancaOrcamento>[];
+      final tipoHistorico = editando ? 'Orçamento atualizado' : 'Orçamento criado';
+
+      if (editando) {
+        final anterior = await (db.select(db.orcamentos)
+              ..where((registro) => registro.id.equals(orcamentoId!)))
+            .getSingleOrNull();
+        if (anterior == null) {
+          throw Exception('O orçamento não foi encontrado para atualização.');
+        }
+        final clienteAnterior = await (db.select(db.clientes)
+              ..where((registro) => registro.id.equals(anterior.clienteId)))
+            .getSingleOrNull();
+        final itensAnteriores = await (db.select(db.orcamentoItens)
+              ..where((registro) => registro.orcamentoId.equals(orcamentoId!))
+              ..orderBy([(registro) => OrderingTerm.asc(registro.id)]))
+            .get();
+
+        _comparar(mudancas, 'Cliente', clienteAnterior?.nome,
+            cliente.value!.nome);
+        _comparar(mudancas, 'Nome do evento', anterior.titulo, titulo);
+        _comparar(mudancas, 'Data e horário', _dataHistorico(anterior.dataEvento),
+            _dataHistorico(dataEvento.value!));
+        _comparar(mudancas, 'Local', _textoHistorico(anterior.local),
+            _textoHistorico(local.isEmpty ? null : local));
+        _comparar(mudancas, 'Convidados', '${anterior.convidados}',
+            '${convidados.value}');
+        _comparar(mudancas, 'Desconto', formatarMoeda(anterior.descontoCentavos),
+            formatarMoeda(descontoCentavos.value));
+        _comparar(
+          mudancas,
+          'Compra dos ingredientes',
+          anterior.ingredientesCompradosPeloBufe ? 'Bufê' : 'Cliente',
+          ingredientesCompradosPeloBufe.value ? 'Bufê' : 'Cliente',
+        );
+        _comparar(mudancas, 'Observações', _textoHistorico(anterior.observacoes),
+            _textoHistorico(observacoes.isEmpty ? null : observacoes));
+
+        final itensAntes = _resumoItensAntigos(itensAnteriores);
+        final itensDepois = _resumoItensNovos(itens);
+        _comparar(mudancas, 'Itens e valores', itensAntes, itensDepois);
+
+        final totalAntes = _totalHistorico(anterior, itensAnteriores);
+        _comparar(mudancas, 'Total do orçamento', formatarMoeda(totalAntes),
+            formatarMoeda(totalCentavos));
+      } else {
+        mudancas.add(
+          _MudancaOrcamento(
+            campo: 'Orçamento',
+            anterior: null,
+            novo: '$titulo · Total: ${formatarMoeda(totalCentavos)}',
+          ),
+        );
+      }
 
       await db.transaction(() async {
-        late final int id;
+        late final int idSalvo;
 
         if (editando) {
-          id = orcamentoId!;
-
+          idSalvo = orcamentoId!;
           await (db.update(db.orcamentos)
-                ..where((orcamento) => orcamento.id.equals(id)))
+                ..where((orcamento) => orcamento.id.equals(idSalvo)))
               .write(
             OrcamentosCompanion(
               clienteId: Value(cliente.value!.id),
@@ -429,17 +481,14 @@ class OrcamentoController extends GetxController {
               descontoCentavos: Value(descontoCentavos.value),
               ingredientesCompradosPeloBufe:
                   Value(ingredientesCompradosPeloBufe.value),
-              observacoes: Value(
-                observacoes.isEmpty ? null : observacoes,
-              ),
+              observacoes: Value(observacoes.isEmpty ? null : observacoes),
             ),
           );
-
           await (db.delete(db.orcamentoItens)
-                ..where((item) => item.orcamentoId.equals(id)))
+                ..where((item) => item.orcamentoId.equals(idSalvo)))
               .go();
         } else {
-          id = await db.into(db.orcamentos).insert(
+          idSalvo = await db.into(db.orcamentos).insert(
                 OrcamentosCompanion.insert(
                   clienteId: cliente.value!.id,
                   titulo: titulo,
@@ -449,9 +498,7 @@ class OrcamentoController extends GetxController {
                   descontoCentavos: Value(descontoCentavos.value),
                   ingredientesCompradosPeloBufe:
                       Value(ingredientesCompradosPeloBufe.value),
-                  observacoes: Value(
-                    observacoes.isEmpty ? null : observacoes,
-                  ),
+                  observacoes: Value(observacoes.isEmpty ? null : observacoes),
                   status: Value(_status),
                 ),
               );
@@ -460,27 +507,45 @@ class OrcamentoController extends GetxController {
         for (final item in itens) {
           await db.into(db.orcamentoItens).insert(
                 OrcamentoItensCompanion.insert(
-                  orcamentoId: id,
+                  orcamentoId: idSalvo,
                   nome: item.nome,
                   precoCentavos: Value(item.precoCentavos),
                   quantidade: Value(item.quantidade),
                   tipoCobranca: Value(item.tipoCobranca),
                   categoria: Value(item.categoria),
                   receitaId: Value(item.receitaId),
-                  receitaIngredienteId:
-                      Value(item.receitaIngredienteId),
+                  receitaIngredienteId: Value(item.receitaIngredienteId),
                   receitaNome: Value(item.receitaNome),
                   unidade: Value(item.unidade),
-                  quantidadeMilesimos:
-                      Value(item.quantidadeMilesimos),
+                  quantidadeMilesimos: Value(item.quantidadeMilesimos),
                   servicoId: Value(item.servicoId),
                 ),
               );
         }
+
+        final ocorridoEm = DateTime.now().millisecondsSinceEpoch;
+        for (final mudanca in mudancas) {
+          await db.customStatement(
+            '''
+            INSERT INTO orcamento_historico
+              (orcamento_id, ocorrido_em, tipo, campo, valor_anterior,
+               valor_novo, autor)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''',
+            [
+              idSalvo,
+              ocorridoEm,
+              tipoHistorico,
+              mudanca.campo,
+              mudanca.anterior,
+              mudanca.novo,
+              'Usuário local',
+            ],
+          );
+        }
       });
 
       Get.back(result: true);
-
       Get.snackbar(
         'Pronto',
         editando ? 'Orçamento atualizado.' : 'Orçamento criado.',
@@ -496,4 +561,87 @@ class OrcamentoController extends GetxController {
       salvando.value = false;
     }
   }
+
+  void _comparar(
+    List<_MudancaOrcamento> destino,
+    String campo,
+    String? anterior,
+    String? novo,
+  ) {
+    if (anterior == novo) return;
+    destino.add(
+      _MudancaOrcamento(campo: campo, anterior: anterior, novo: novo),
+    );
+  }
+
+  String _textoHistorico(String? valor) {
+    final texto = valor?.trim() ?? '';
+    return texto.isEmpty ? '—' : texto;
+  }
+
+  String _dataHistorico(DateTime data) {
+    String dois(int valor) => valor.toString().padLeft(2, '0');
+    return '${dois(data.day)}/${dois(data.month)}/${data.year} '
+        '${dois(data.hour)}:${dois(data.minute)}';
+  }
+
+  String _resumoItensAntigos(List<OrcamentoIten> lista) {
+    if (lista.isEmpty) return 'Nenhum item';
+    return lista.map((item) {
+      final categoria = item.categoria == ItemOrcamento.categoriaIngrediente
+          ? 'Ingrediente'
+          : 'Serviço';
+      return '${item.nome} · $categoria · qtd. ${item.quantidade} · '
+          '${formatarMoeda(item.precoCentavos)} · ${item.tipoCobranca}';
+    }).join('\n');
+  }
+
+  String _resumoItensNovos(List<ItemOrcamento> lista) {
+    if (lista.isEmpty) return 'Nenhum item';
+    return lista.map((item) {
+      final categoria = item.categoria == ItemOrcamento.categoriaIngrediente
+          ? 'Ingrediente'
+          : 'Serviço';
+      return '${item.nome} · $categoria · qtd. ${item.quantidade} · '
+          '${formatarMoeda(item.precoCentavos)} · ${item.tipoCobranca}';
+    }).join('\n');
+  }
+
+  int _totalHistorico(Orcamento orcamento, List<OrcamentoIten> lista) {
+    var ingredientes = 0;
+    var servicos = 0;
+    for (final item in lista) {
+      final totalItem = switch (item.tipoCobranca) {
+        ItemOrcamento.cobrancaPorConvidado =>
+          item.precoCentavos * orcamento.convidados,
+        ItemOrcamento.cobrancaPorUnidade => item.precoCentavos * item.quantidade,
+        _ => item.precoCentavos,
+      };
+      if (item.categoria == ItemOrcamento.categoriaIngrediente) {
+        ingredientes += totalItem;
+      } else {
+        servicos += totalItem;
+      }
+    }
+    final baseIngredientes = orcamento.ingredientesCompradosPeloBufe
+        ? ingredientes
+        : 0;
+    final adicional = orcamento.ingredientesCompradosPeloBufe
+        ? _vintePorCento(ingredientes)
+        : 0;
+    return (baseIngredientes + adicional + servicos - orcamento.descontoCentavos)
+        .clamp(0, 0x7FFFFFFFFFFFFFFF);
+  }
+}
+
+class _MudancaOrcamento {
+  const _MudancaOrcamento({
+    required this.campo,
+    required this.anterior,
+    required this.novo,
+  });
+
+  final String campo;
+  final String? anterior;
+  final String? novo;
 }

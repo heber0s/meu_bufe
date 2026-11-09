@@ -4,23 +4,84 @@ import 'package:get/get.dart' hide Value;
 import '../../core/theme/app_theme.dart';
 import '../../data/database/app_database.dart';
 import 'orcamento_detalhe_controller.dart';
-import 'widgets/orcamento_item_editor.dart';
-import 'widgets/orcamento_acompanhamento_section.dart';
 
 class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
   const OrcamentoDetalheView({super.key});
 
   Widget _buildFloatingActionButton() {
-    return Obx(
-      () => OrcamentoItemEditorMenu(
-        enabled: !controller.aprovado &&
-            !controller.processando.value &&
-            !controller.salvando.value,
-        onItemManual: controller.abrirItemManual,
-        onReceita: controller.abrirSelecaoReceita,
-        onServico: controller.abrirSelecaoServico,
-      ),
-    );
+    return Obx(() {
+      final enabled = !controller.aprovado &&
+          !controller.processando.value &&
+          !controller.salvando.value;
+
+      return PopupMenuButton<String>(
+        enabled: enabled,
+        tooltip: 'Adicionar item',
+        onSelected: (opcao) {
+          switch (opcao) {
+            case 'manual':
+              controller.abrirItemManual();
+            case 'receita':
+              controller.abrirSelecaoReceita();
+            case 'servico':
+              controller.abrirSelecaoServico();
+          }
+        },
+        itemBuilder: (context) => const [
+          PopupMenuItem(
+            value: 'manual',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.edit_outlined),
+              title: Text('Item manual'),
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'receita',
+            child: Row(
+              children: [
+                Icon(Icons.restaurant_menu_rounded),
+                SizedBox(width: 12),
+                Text('Adicionar receita'),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'servico',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.room_service_outlined),
+              title: Text('Serviço do catálogo'),
+            ),
+          ),
+        ],
+        child: Material(
+          color: AppColors.ouro,
+          elevation: 2,
+          shape: const StadiumBorder(),
+          child: const SizedBox(
+            height: 56,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    'Adicionar',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    });
   }
 
   @override
@@ -134,8 +195,6 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
             children: [
               _buildResumoOrcamento(orcamento),
-              const SizedBox(height: 16),
-              OrcamentoAcompanhamentoSection(controller: controller),
               const SizedBox(height: 18),
               _buildSecaoProdutos(),
             ],
