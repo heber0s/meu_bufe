@@ -181,6 +181,22 @@ class AppDatabase extends _$AppDatabase {
         },
         beforeOpen: (OpeningDetails details) async {
           await customStatement('PRAGMA foreign_keys = ON');
+          await customStatement('''
+            CREATE TABLE IF NOT EXISTS orcamento_acompanhamentos (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              orcamento_id INTEGER NOT NULL,
+              contato_em INTEGER NOT NULL,
+              canal TEXT NOT NULL,
+              resumo TEXT NOT NULL,
+              proximo_retorno INTEGER,
+              FOREIGN KEY (orcamento_id) REFERENCES orcamentos(id)
+                ON DELETE CASCADE
+            )
+          ''');
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS orcamento_acompanhamentos_orcamento_idx
+            ON orcamento_acompanhamentos (orcamento_id, contato_em DESC)
+          ''');
         },
       );
 }

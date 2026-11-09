@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/database/app_database.dart';
 import 'orcamento_detalhe_controller.dart';
 import 'widgets/orcamento_item_editor.dart';
+import 'widgets/orcamento_acompanhamento_section.dart';
 
 class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
   const OrcamentoDetalheView({super.key});
@@ -133,6 +134,8 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
             children: [
               _buildResumoOrcamento(orcamento),
+              const SizedBox(height: 16),
+              OrcamentoAcompanhamentoSection(controller: controller),
               const SizedBox(height: 18),
               _buildSecaoProdutos(),
             ],

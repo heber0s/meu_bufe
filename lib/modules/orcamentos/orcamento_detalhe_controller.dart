@@ -9,9 +9,41 @@ import 'package:meu_bufe/modules/orcamentos/orcamento_totais.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/services/orcamento_pdf_service.dart';
+import '../../core/services/notificacao_service.dart';
 import '../../core/services/receita_orcamento_service.dart';
 import '../../data/database/app_database.dart';
 import 'widgets/orcamento_item_editor.dart';
+
+class OrcamentoAcompanhamento {
+  const OrcamentoAcompanhamento({
+    required this.id,
+    required this.contatoEm,
+    required this.canal,
+    required this.resumo,
+    required this.proximoRetorno,
+  });
+
+  final int id;
+  final DateTime contatoEm;
+  final String canal;
+  final String resumo;
+  final DateTime? proximoRetorno;
+
+  factory OrcamentoAcompanhamento.fromRow(QueryRow row) {
+    final retornoMs = row.read<int?>('proximo_retorno');
+    return OrcamentoAcompanhamento(
+      id: row.read<int>('id'),
+      contatoEm: DateTime.fromMillisecondsSinceEpoch(
+        row.read<int>('contato_em'),
+      ),
+      canal: row.read<String>('canal'),
+      resumo: row.read<String>('resumo'),
+      proximoRetorno: retornoMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(retornoMs),
+    );
+  }
+}
 
 class OrcamentoDetalheController extends GetxController {
   OrcamentoDetalheController({
@@ -25,6 +57,7 @@ class OrcamentoDetalheController extends GetxController {
   final orcamento = Rxn<Orcamento>();
   final itens = <OrcamentoIten>[].obs;
   final receitas = <Receita>[].obs;
+  final acompanhamentos = <OrcamentoAcompanhamento>[].obs;
   final carregando = false.obs;
   final processando = false.obs;
   final salvando = false.obs;
@@ -134,6 +167,7 @@ class OrcamentoDetalheController extends GetxController {
           .getSingleOrNull();
 
       _observarItens();
+      await carregarAcompanhamentos();
     } catch (_) {
       erro.value = 'Não foi possível carregar o orçamento.';
       Get.snackbar(
@@ -144,6 +178,121 @@ class OrcamentoDetalheController extends GetxController {
     } finally {
       carregando.value = false;
     }
+  }
+
+  Future<void> carregarAcompanhamentos() async {
+    final linhas = await db.customSelect(
+      '''
+      SELECT id, contato_em, canal, resumo, proximo_retorno
+      FROM orcamento_acompanhamentos
+      WHERE orcamento_id = ?
+      ORDER BY contato_em DESC, id DESC
+      ''',
+      variables: [Variable.withInt(orcamentoId)],
+    ).get();
+    acompanhamentos.assignAll(
+      linhas.map(OrcamentoAcompanhamento.fromRow),
+    );
+  }
+
+  Future<void> registrarAcompanhamento({
+    required String canal,
+    required String resumo,
+    required DateTime? proximoRetorno,
+  }) async {
+    final atual = orcamento.value;
+    final clienteAtual = cliente.value;
+    if (atual == null || clienteAtual == null) {
+      _mostrarMensagemOrcamentoIndisponivel();
+      return;
+    }
+    if (aprovado) {
+      Get.snackbar(
+        'Orçamento aprovado',
+        'Não é necessário agendar novos retornos para este orçamento.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    if (resumo.trim().isEmpty) {
+      Get.snackbar(
+        'Resumo obrigatório',
+        'Descreva brevemente o resultado do contato.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    if (proximoRetorno != null && !proximoRetorno.isAfter(DateTime.now())) {
+      Get.snackbar(
+        'Data inválida',
+        'Escolha uma data futura ou remova o lembrete.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    try {
+      await db.customStatement(
+        '''
+        INSERT INTO orcamento_acompanhamentos
+          (orcamento_id, contato_em, canal, resumo, proximo_retorno)
+        VALUES (?, ?, ?, ?, ?)
+        ''',
+        [
+          atual.id,
+          DateTime.now().millisecondsSinceEpoch,
+          canal,
+          resumo.trim(),
+          proximoRetorno?.millisecondsSinceEpoch,
+        ],
+      );
+      await carregarAcompanhamentos();
+
+      if (Get.isRegistered<NotificacaoService>()) {
+        final notificacoes = Get.find<NotificacaoService>();
+        try {
+          if (proximoRetorno == null) {
+            await notificacoes.cancelarRetorno(atual.id);
+          } else {
+            await notificacoes.agendarRetorno(
+              orcamentoId: atual.id,
+              titulo: atual.titulo,
+              cliente: clienteAtual.nome,
+              resumo: resumo,
+              quando: proximoRetorno,
+            );
+          }
+        } catch (_) {
+          Get.snackbar(
+            'Contato registrado',
+            'O registro foi salvo, mas não foi possível configurar a notificação.',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+          return;
+        }
+      }
+
+      Get.snackbar(
+        'Contato registrado',
+        proximoRetorno == null
+            ? 'O histórico foi atualizado sem novo lembrete.'
+            : 'O retorno ficou agendado para '
+                '${_formatarDataHora(proximoRetorno)}.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Erro',
+        'Não foi possível salvar o contato no orçamento.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  String _formatarDataHora(DateTime data) {
+    String dois(int valor) => valor.toString().padLeft(2, '0');
+    return '${dois(data.day)}/${dois(data.month)}/${data.year} '
+        '${dois(data.hour)}:${dois(data.minute)}';
   }
 
   void _observarItens() {
@@ -670,6 +819,10 @@ class OrcamentoDetalheController extends GetxController {
       });
 
       await carregarOrcamento();
+
+      if (Get.isRegistered<NotificacaoService>()) {
+        await Get.find<NotificacaoService>().cancelarRetorno(atual.id);
+      }
 
       Get.snackbar(
         'Orçamento confirmado',
