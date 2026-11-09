@@ -14,6 +14,8 @@ import '../modules/orcamentos/orcamento_detalhe_view.dart';
 import '../modules/orcamentos/orcamento_form_binding.dart';
 import '../modules/orcamentos/orcamento_form_view.dart';
 import '../modules/orcamentos/funil_vendas_view.dart';
+import '../modules/relatorios/relatorios_binding.dart';
+import '../modules/relatorios/relatorios_view.dart';
 import '../modules/receitas/receitas_binding.dart';
 import '../modules/receitas/receitas_view.dart';
 import '../modules/servicos/servicos_binding.dart';
@@ -26,7 +28,6 @@ abstract class AppPages {
   static const _duracao = Duration(milliseconds: 400);
 
   static final pages = <GetPage>[
-    // Shell com a navegação inferior (Orçamentos / Agenda / Clientes)
     GetPage(
       name: Routes.home,
       page: () => const HomeView(),
@@ -34,8 +35,6 @@ abstract class AppPages {
       transition: Transition.fadeIn,
       transitionDuration: _duracao,
     ),
-
-    // Formulário de orçamento: sobe de baixo, como um "modal" de página inteira
     GetPage(
       name: Routes.orcamentoForm,
       page: () => const OrcamentoFormView(),
@@ -44,8 +43,6 @@ abstract class AppPages {
       transitionDuration: _duracao,
       fullscreenDialog: true,
     ),
-
-    // Detalhe: fade suave para o Hero da lista "voar" até a SliverAppBar
     GetPage(
       name: Routes.orcamentoDetalhe,
       page: () => const OrcamentoDetalheView(),
@@ -53,14 +50,19 @@ abstract class AppPages {
       transition: Transition.fadeIn,
       transitionDuration: _duracao,
     ),
-
     GetPage(
       name: Routes.funilVendas,
       page: () => const FunilVendasView(),
       transition: Transition.rightToLeftWithFade,
       transitionDuration: _duracao,
     ),
-
+    GetPage(
+      name: Routes.relatorios,
+      page: () => const RelatoriosView(),
+      binding: RelatoriosBinding(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _duracao,
+    ),
     GetPage(
       name: Routes.agenda,
       page: () => const AgendaView(),
@@ -68,7 +70,6 @@ abstract class AppPages {
       transition: Transition.rightToLeftWithFade,
       transitionDuration: _duracao,
     ),
-
     GetPage(
       name: Routes.clientes,
       page: () => const ClientesView(),
@@ -76,13 +77,11 @@ abstract class AppPages {
       transition: Transition.rightToLeftWithFade,
       transitionDuration: _duracao,
     ),
-
     GetPage(
       name: Routes.ajustes,
       page: () => const AjustesView(),
       binding: BindingsBuilder(() => Get.lazyPut(() => AjustesController())),
     ),
-
     GetPage(
       name: Routes.receitas,
       page: () => const ReceitasView(),

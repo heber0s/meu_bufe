@@ -17,6 +17,11 @@ class HomeView extends GetView<HomeController> {
       appBar: AppBar(
         actions: [
           IconButton(
+            tooltip: 'Relatórios',
+            onPressed: () => Get.toNamed(Routes.relatorios),
+            icon: const Icon(Icons.bar_chart_rounded),
+          ),
+          IconButton(
             tooltip: 'Funil de vendas',
             onPressed: () => Get.toNamed(Routes.funilVendas),
             icon: const Icon(Icons.filter_alt_outlined),
@@ -34,8 +39,6 @@ class HomeView extends GetView<HomeController> {
         ],
       ),
       extendBody: true,
-      // Obx isolado: só o IndexedStack reage à troca de aba.
-      // IndexedStack mantém o estado (scroll, busca) de cada aba.
       body: Obx(() => IndexedStack(
             index: controller.abaAtual.value,
             children: const [
@@ -44,7 +47,6 @@ class HomeView extends GetView<HomeController> {
               ClientesView(),
             ],
           )),
-      // O botão "Novo orçamento" só aparece na aba de orçamentos
       floatingActionButton: Obx(() => AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             transitionBuilder: (child, anim) =>
