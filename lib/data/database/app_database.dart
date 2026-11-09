@@ -169,8 +169,8 @@ class OrcamentoReceitas extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_open());
 
-  // Schema inicial novo. Como você vai testar com banco limpo, não precisamos
-  // manter a sequência de migrações do schema antigo.
+  // Schema inicial novo. As tabelas auxiliares sem classes Drift são
+  // criadas no beforeOpen para manter compatibilidade com o banco local.
   @override
   int get schemaVersion => 1;
 
@@ -196,6 +196,24 @@ class AppDatabase extends _$AppDatabase {
           await customStatement('''
             CREATE INDEX IF NOT EXISTS orcamento_acompanhamentos_orcamento_idx
             ON orcamento_acompanhamentos (orcamento_id, contato_em DESC)
+          ''');
+          await customStatement('''
+            CREATE TABLE IF NOT EXISTS evento_checklist_itens (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              evento_id INTEGER NOT NULL,
+              titulo TEXT NOT NULL,
+              responsavel TEXT,
+              prazo_em INTEGER,
+              concluida INTEGER NOT NULL DEFAULT 0,
+              ordem INTEGER NOT NULL DEFAULT 0,
+              criado_em INTEGER NOT NULL,
+              FOREIGN KEY (evento_id) REFERENCES eventos(id)
+                ON DELETE CASCADE
+            )
+          ''');
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS evento_checklist_evento_idx
+            ON evento_checklist_itens (evento_id, concluida, ordem, id)
           ''');
         },
       );

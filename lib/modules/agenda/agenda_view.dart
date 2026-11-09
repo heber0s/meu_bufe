@@ -7,6 +7,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../data/database/app_database.dart';
 import 'agenda_controller.dart';
+import 'evento_checklist_controller.dart';
+import 'evento_checklist_sheet.dart';
 
 class AgendaView extends GetView<AgendaController> {
   const AgendaView({super.key});
@@ -270,11 +272,25 @@ class _EventoCard extends StatelessWidget {
                   controller.abrirFormulario(evento: evento);
                 }
 
+                if (opcao == 'checklist') {
+                  _abrirChecklist(evento);
+                }
+
                 if (opcao == 'excluir') {
                   await controller.excluirEvento(evento);
                 }
               },
               itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'checklist',
+                  child: Row(
+                    children: [
+                      Icon(Icons.checklist_rounded, size: 20),
+                      SizedBox(width: 10),
+                      Text('Checklist'),
+                    ],
+                  ),
+                ),
                 PopupMenuItem(
                   value: 'editar',
                   child: Text('Editar'),
@@ -289,6 +305,28 @@ class _EventoCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _abrirChecklist(Evento evento) {
+    final tag = 'evento-checklist-${evento.id}';
+    final checklistController = Get.put(
+      EventoChecklistController(eventoId: evento.id),
+      tag: tag,
+    );
+
+    Get.bottomSheet<void>(
+      EventoChecklistSheet(
+        evento: evento,
+        controller: checklistController,
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+    ).whenComplete(() {
+      if (Get.isRegistered<EventoChecklistController>(tag: tag)) {
+        Get.delete<EventoChecklistController>(tag: tag);
+      }
+    });
   }
 
   String _hora(DateTime data) {
