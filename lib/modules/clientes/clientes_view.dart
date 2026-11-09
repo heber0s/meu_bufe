@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../data/database/app_database.dart';
+import '../../routes/app_routes.dart';
 import 'clientes_controller.dart';
 
 class ClientesView extends GetView<ClientesController> {
@@ -126,7 +127,7 @@ class _ClienteCard extends StatelessWidget {
     final controller = Get.find<ClientesController>();
 
     return PressableScale(
-      onTap: () => controller.abrirFormulario(cliente: cliente),
+      onTap: () => Get.toNamed(Routes.clienteDetalhe(cliente.id)),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

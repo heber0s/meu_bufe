@@ -5,6 +5,8 @@ import '../modules/agenda/agenda_view.dart';
 import '../modules/ajustes/ajustes_controller.dart';
 import '../modules/ajustes/ajustes_view.dart';
 import '../modules/catalogo/catalogo_view.dart';
+import '../modules/clientes/cliente_detalhe_binding.dart';
+import '../modules/clientes/cliente_detalhe_view.dart';
 import '../modules/clientes/clientes_binding.dart';
 import '../modules/clientes/clientes_view.dart';
 import '../modules/home/home_binding.dart';
@@ -74,6 +76,13 @@ abstract class AppPages {
       name: Routes.clientes,
       page: () => const ClientesView(),
       binding: ClientesBinding(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _duracao,
+    ),
+    GetPage(
+      name: Routes.clienteDetalhePath,
+      page: () => const ClienteDetalheView(),
+      binding: ClienteDetalheBinding(),
       transition: Transition.rightToLeftWithFade,
       transitionDuration: _duracao,
     ),
