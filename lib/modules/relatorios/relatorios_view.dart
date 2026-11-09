@@ -25,6 +25,12 @@ class RelatoriosView extends GetView<RelatoriosController> {
         if (controller.orcamentos.isEmpty) {
           return const _EstadoVazio();
         }
+        if (controller.orcamentosFiltrados.isEmpty) {
+          return _EstadoVazio(
+            periodo: controller.periodoLabel,
+            onLimpar: controller.limparPeriodo,
+          );
+        }
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
@@ -34,11 +40,13 @@ class RelatoriosView extends GetView<RelatoriosController> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Indicadores de todos os orçamentos cadastrados.',
+              'Indicadores de ${controller.periodoLabel}.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.texto.withValues(alpha: 0.68),
                   ),
             ),
+            const SizedBox(height: 14),
+            _SeletorPeriodo(controller: controller),
             const SizedBox(height: 20),
             _IndicadorPrincipal(
               quantidade: controller.quantidadeTotal,
@@ -117,6 +125,98 @@ class RelatoriosView extends GetView<RelatoriosController> {
 
   static String _formatarMoeda(int centavos) =>
       _moeda.format(centavos / 100);
+}
+
+class _SeletorPeriodo extends StatelessWidget {
+  const _SeletorPeriodo({required this.controller});
+
+  final RelatoriosController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.superficie,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.sombraSutil,
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.calendar_month_rounded, color: AppColors.roseGold),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Período analisado',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.texto.withValues(alpha: 0.64),
+                        )),
+                Text(controller.periodoLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        )),
+              ],
+            ),
+          ),
+          PopupMenuButton<PeriodoRelatorio>(
+            tooltip: 'Selecionar período',
+            icon: const Icon(Icons.tune_rounded, color: AppColors.texto),
+            onSelected: (periodo) async {
+              if (periodo != PeriodoRelatorio.personalizado) {
+                controller.definirPeriodo(periodo);
+                return;
+              }
+              final hoje = DateTime.now();
+              final intervalo = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+                initialDateRange: DateTimeRange(
+                  start: DateTime(hoje.year, hoje.month, 1),
+                  end: hoje,
+                ),
+                helpText: 'Selecione o período dos eventos',
+                saveText: 'Aplicar período',
+              );
+              if (intervalo != null) {
+                controller.definirPeriodo(
+                  PeriodoRelatorio.personalizado,
+                  inicio: intervalo.start,
+                  fim: intervalo.end,
+                );
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: PeriodoRelatorio.todos,
+                child: Text('Todo o período'),
+              ),
+              PopupMenuItem(
+                value: PeriodoRelatorio.mesAtual,
+                child: Text('Este mês'),
+              ),
+              PopupMenuItem(
+                value: PeriodoRelatorio.ultimos30Dias,
+                child: Text('Últimos 30 dias'),
+              ),
+              PopupMenuItem(
+                value: PeriodoRelatorio.anoAtual,
+                child: Text('Este ano'),
+              ),
+              PopupMenuItem(
+                value: PeriodoRelatorio.personalizado,
+                child: Text('Escolher datas...'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _IndicadorPrincipal extends StatelessWidget {
@@ -308,7 +408,10 @@ class _EtapaCard extends StatelessWidget {
 }
 
 class _EstadoVazio extends StatelessWidget {
-  const _EstadoVazio();
+  const _EstadoVazio({this.periodo, this.onLimpar});
+
+  final String? periodo;
+  final VoidCallback? onLimpar;
 
   @override
   Widget build(BuildContext context) {
@@ -329,17 +432,29 @@ class _EstadoVazio extends StatelessWidget {
                   size: 36, color: AppColors.roseGold),
             ),
             const SizedBox(height: 18),
-            Text('Ainda não há dados para exibir',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              onLimpar == null ? 'Ainda não há dados para exibir' : 'Nenhum orçamento neste período',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
-              'Cadastre orçamentos para acompanhar os valores e a conversão por etapa.',
+              onLimpar == null
+                  ? 'Cadastre orçamentos para acompanhar os valores e a conversão por etapa.'
+                  : 'Não encontramos orçamentos com evento em $periodo.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.texto.withValues(alpha: 0.68),
                   ),
             ),
+            if (onLimpar != null) ...[
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: onLimpar,
+                icon: const Icon(Icons.restart_alt_rounded),
+                label: const Text('Ver todo o período'),
+              ),
+            ],
           ],
         ),
       ),
