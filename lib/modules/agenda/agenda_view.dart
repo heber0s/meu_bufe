@@ -124,6 +124,9 @@ class _Calendario extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(8),
         child: TableCalendar<Evento>(
+          // Mantem o calendario reativo ao carregamento/alteracao dos eventos.
+          // Sem esta dependencia, os marcadores so atualizam ao selecionar um dia.
+          key: ValueKey(controller.eventos.length),
           locale: 'pt_BR',
           firstDay: DateTime(2020),
           lastDay: DateTime(2200),
