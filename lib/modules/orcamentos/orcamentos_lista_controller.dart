@@ -96,6 +96,20 @@ class OrcamentosListaController extends GetxController {
   int get totalAprovadoCentavos => _somaPorStatus('aprovado');
   int get totalPendenteCentavos => _somaPorStatus('pendente');
 
+  int get quantidadeAprovados =>
+      resumos.where((r) => r.orcamento.status == 'aprovado').length;
+
+  int get quantidadePendentes =>
+      resumos.where((r) => r.orcamento.status == 'pendente').length;
+
+  /// O funil usa somente os dois estados comerciais atualmente existentes.
+  int get quantidadeNoFunil => quantidadeAprovados + quantidadePendentes;
+
+  /// Participação de aprovados entre orçamentos pendentes e aprovados.
+  double get participacaoAprovados => quantidadeNoFunil == 0
+      ? 0.0
+      : quantidadeAprovados / quantidadeNoFunil;
+
   int _somaPorStatus(String status) => resumos
       .where((r) => r.orcamento.status == status)
       .fold(0, (s, r) => s + r.totalCentavos);

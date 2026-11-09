@@ -10,6 +10,7 @@ abstract class Routes {
   static const receitas = '/receitas';
   static const servicos = '/servicos';
   static const catalogo = '/catalogo';
+  static const funilVendas = '/funil-vendas';
 
   // Helper para rotas com parâmetro: Get.toNamed(Routes.detalhe(orcamento.id))
   static String detalhe(int id) => '/orcamentos/$id';

@@ -13,6 +13,7 @@ import '../modules/orcamentos/orcamento_detalhe_binding.dart';
 import '../modules/orcamentos/orcamento_detalhe_view.dart';
 import '../modules/orcamentos/orcamento_form_binding.dart';
 import '../modules/orcamentos/orcamento_form_view.dart';
+import '../modules/orcamentos/funil_vendas_view.dart';
 import '../modules/receitas/receitas_binding.dart';
 import '../modules/receitas/receitas_view.dart';
 import '../modules/servicos/servicos_binding.dart';
@@ -50,6 +51,13 @@ abstract class AppPages {
       page: () => const OrcamentoDetalheView(),
       binding: OrcamentoDetalheBinding(),
       transition: Transition.fadeIn,
+      transitionDuration: _duracao,
+    ),
+
+    GetPage(
+      name: Routes.funilVendas,
+      page: () => const FunilVendasView(),
+      transition: Transition.rightToLeftWithFade,
       transitionDuration: _duracao,
     ),
 

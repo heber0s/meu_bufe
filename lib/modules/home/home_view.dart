@@ -17,6 +17,11 @@ class HomeView extends GetView<HomeController> {
       appBar: AppBar(
         actions: [
           IconButton(
+            tooltip: 'Funil de vendas',
+            onPressed: () => Get.toNamed(Routes.funilVendas),
+            icon: const Icon(Icons.filter_alt_outlined),
+          ),
+          IconButton(
             tooltip: 'Catálogo',
             onPressed: () => Get.toNamed(Routes.catalogo),
             icon: const Icon(Icons.grid_view_rounded),
