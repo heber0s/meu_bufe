@@ -54,16 +54,22 @@ class AjustesView extends GetView<AjustesController> {
                   decoration: const InputDecoration(labelText: 'Nome do bufê'),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: controller.telefoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.next,
-                  inputFormatters: [const _TelefoneInputFormatter()],
-                  decoration: const InputDecoration(
-                    labelText: 'Telefone',
-                    hintText: '(11) 99999-9999',
-                  ),
-                ),
+                Obx(() => TextField(
+                      controller: controller.telefoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      inputFormatters: [const _TelefoneInputFormatter()],
+                      onChanged: (_) {
+                        if (controller.erroTelefone.value != null) {
+                          controller.erroTelefone.value = null;
+                        }
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Telefone',
+                        hintText: '(11) 99999-9999',
+                        errorText: controller.erroTelefone.value,
+                      ),
+                    )),
                 const SizedBox(height: 12),
                 TextField(
                   controller: controller.emailCtrl,

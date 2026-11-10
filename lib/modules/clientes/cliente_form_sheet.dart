@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/telefone_validator.dart';
 
 class ClienteDuplicidade {
   const ClienteDuplicidade({this.telefone = false, this.email = false});
@@ -240,7 +241,12 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
                         setState(() => _erroTelefoneDuplicado = null);
                       }
                     },
-                    validator: (_) => _erroTelefoneDuplicado,
+                    validator: (valor) {
+                      if (_erroTelefoneDuplicado != null) {
+                        return _erroTelefoneDuplicado;
+                      }
+                      return TelefoneValidator.validar(valor ?? '');
+                    },
                     decoration: _decoracao(
                       'Telefone',
                       Icons.phone_outlined,

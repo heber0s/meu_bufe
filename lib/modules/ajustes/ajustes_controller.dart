@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/services/backup_service.dart';
 import '../../core/services/empresa_service.dart';
+import '../../core/utils/telefone_validator.dart';
 
 class AjustesController extends GetxController {
   final _empresa = Get.find<EmpresaService>();
@@ -16,6 +17,7 @@ class AjustesController extends GetxController {
   final restaurando = false.obs;
   final salvandoEmpresa = false.obs;
   final salvandoLogo = false.obs;
+  final erroTelefone = RxnString();
 
   // ---- campos do formulário "Dados do bufê"
   final nomeCtrl = TextEditingController();
@@ -88,6 +90,16 @@ class AjustesController extends GetxController {
 
     final nome = nomeCtrl.text.trim();
     final validade = int.tryParse(validadeCtrl.text.trim());
+    erroTelefone.value = TelefoneValidator.validar(telefoneCtrl.text);
+
+    if (erroTelefone.value != null) {
+      Get.snackbar(
+        'Telefone inválido',
+        erroTelefone.value!,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
 
     if (nome.isEmpty) {
       Get.snackbar('Dados incompletos', 'Informe o nome do bufê.',
