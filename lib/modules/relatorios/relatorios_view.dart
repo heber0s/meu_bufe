@@ -108,6 +108,31 @@ class RelatoriosView extends GetView<RelatoriosController> {
               ],
             ),
             const SizedBox(height: 16),
+            const SizedBox(height: 26),
+            Text('Clientes em destaque',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 5),
+            Text(
+              'Maiores valores aprovados em ${controller.periodoLabel}.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.texto.withValues(alpha: 0.68),
+                  ),
+            ),
+            const SizedBox(height: 12),
+            if (controller.principaisClientes.isEmpty)
+              const _SemClientesAprovados()
+            else
+              ...controller.principaisClientes.asMap().entries.map((entry) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _ClienteDestaqueCard(
+                    posicao: entry.key + 1,
+                    cliente: entry.value,
+                    valor: _formatarMoeda(entry.value.valorCentavos),
+                  ),
+                );
+              }),
+            const SizedBox(height: 8),
             Text(
               'A conversão considera apenas orçamentos concluídos: aprovados '
               'e perdidos/recusados. Os valores são totais dos orçamentos, '
@@ -332,6 +357,116 @@ class _ConversaoCard extends StatelessWidget {
                   color: AppColors.roseGold,
                   fontWeight: FontWeight.w700,
                 ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClienteDestaqueCard extends StatelessWidget {
+  const _ClienteDestaqueCard({
+    required this.posicao,
+    required this.cliente,
+    required this.valor,
+  });
+
+  final int posicao;
+  final ClienteRelatorioResumo cliente;
+  final String valor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.superficie,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppTheme.sombraSutil,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: posicao == 1 ? AppColors.champagne : AppColors.fundo,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Text(
+              '$posicao',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: posicao == 1 ? AppColors.roseGold : AppColors.texto,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  cliente.nome,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${cliente.quantidadeOrcamentos} ${cliente.quantidadeOrcamentos == 1 ? 'orçamento aprovado' : 'orçamentos aprovados'}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.texto.withValues(alpha: 0.65),
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              valor,
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.texto,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SemClientesAprovados extends StatelessWidget {
+  const _SemClientesAprovados();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.superficie,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppTheme.sombraSutil,
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.people_alt_outlined, color: AppColors.roseGold),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Ainda não há orçamentos aprovados neste período.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.texto.withValues(alpha: 0.72),
+                  ),
+            ),
           ),
         ],
       ),

@@ -28,6 +28,26 @@ class OrcamentoRelatorio {
   }
 }
 
+class ClienteRelatorioResumo {
+  const ClienteRelatorioResumo({
+    required this.nome,
+    required this.quantidadeOrcamentos,
+    required this.valorCentavos,
+  });
+
+  final String nome;
+  final int quantidadeOrcamentos;
+  final int valorCentavos;
+}
+
+class _AcumuladoCliente {
+  _AcumuladoCliente(this.nome);
+
+  final String nome;
+  int quantidadeOrcamentos = 0;
+  int valorCentavos = 0;
+}
+
 class RelatoriosController extends GetxController {
   final AppDatabase db = Get.find<AppDatabase>();
 
@@ -140,6 +160,37 @@ class RelatoriosController extends GetxController {
 
   static String _dataCurta(DateTime data) =>
       '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+
+  List<ClienteRelatorioResumo> get principaisClientes {
+    final acumulados = <int, _AcumuladoCliente>{};
+    for (final registro in orcamentosFiltrados) {
+      if (registro.orcamento.status.toLowerCase() != 'aprovado') continue;
+      final cliente = registro.cliente;
+      final resumo = acumulados.putIfAbsent(
+        cliente.id,
+        () => _AcumuladoCliente(cliente.nome),
+      );
+      resumo.quantidadeOrcamentos++;
+      resumo.valorCentavos += registro.totalCentavos;
+    }
+
+    final ranking = acumulados.values
+        .map((resumo) => ClienteRelatorioResumo(
+              nome: resumo.nome,
+              quantidadeOrcamentos: resumo.quantidadeOrcamentos,
+              valorCentavos: resumo.valorCentavos,
+            ))
+        .toList();
+    ranking.sort((a, b) {
+      final porValor = b.valorCentavos.compareTo(a.valorCentavos);
+      if (porValor != 0) return porValor;
+      final porQuantidade =
+          b.quantidadeOrcamentos.compareTo(a.quantidadeOrcamentos);
+      if (porQuantidade != 0) return porQuantidade;
+      return a.nome.toLowerCase().compareTo(b.nome.toLowerCase());
+    });
+    return ranking.take(5).toList();
+  }
 
   int get quantidadeTotal => orcamentosFiltrados.length;
   int get valorTotalCentavos =>
