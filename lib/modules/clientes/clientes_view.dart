@@ -77,6 +77,44 @@ class ClientesView extends GetView<ClientesController> {
                 ),
               ),
             ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: Obx(() {
+                  final selecionado = controller.filtroOrcamentos.value;
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _FiltroClientesChip(
+                          rotulo: 'Todos',
+                          quantidade: controller.clientes.length,
+                          selecionado: selecionado == 'todos',
+                          aoSelecionar: () =>
+                              controller.filtroOrcamentos.value = 'todos',
+                        ),
+                        const SizedBox(width: 8),
+                        _FiltroClientesChip(
+                          rotulo: 'Com orçamento',
+                          quantidade: controller.quantidadeComOrcamento,
+                          selecionado: selecionado == 'com_orcamento',
+                          aoSelecionar: () => controller.filtroOrcamentos.value =
+                              'com_orcamento',
+                        ),
+                        const SizedBox(width: 8),
+                        _FiltroClientesChip(
+                          rotulo: 'Sem orçamento',
+                          quantidade: controller.quantidadeSemOrcamento,
+                          selecionado: selecionado == 'sem_orcamento',
+                          aoSelecionar: () => controller.filtroOrcamentos.value =
+                              'sem_orcamento',
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ),
             Obx(() {
               if (controller.carregando.value) {
                 return const SliverFillRemaining(
@@ -93,9 +131,13 @@ class ClientesView extends GetView<ClientesController> {
               final lista = controller.clientesFiltrados;
 
               if (lista.isEmpty) {
-                return const SliverFillRemaining(
+                final vazioPorBuscaOuFiltro = controller.busca.value.trim().isNotEmpty ||
+                    controller.filtroOrcamentos.value != 'todos';
+                return SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _EstadoVazioClientes(),
+                  child: _EstadoVazioClientes(
+                    buscaOuFiltro: vazioPorBuscaOuFiltro,
+                  ),
                 );
               }
 
@@ -190,6 +232,27 @@ class _ClienteCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (controller.orcamentosDoCliente(cliente.id) > 0) ...[
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.description_outlined,
+                          size: 14,
+                          color: AppColors.roseGold,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${controller.orcamentosDoCliente(cliente.id)} ${controller.orcamentosDoCliente(cliente.id) == 1 ? 'orçamento' : 'orçamentos'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.texto.withValues(alpha: 0.62),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -240,8 +303,44 @@ class _ClienteCard extends StatelessWidget {
   }
 }
 
+class _FiltroClientesChip extends StatelessWidget {
+  const _FiltroClientesChip({
+    required this.rotulo,
+    required this.quantidade,
+    required this.selecionado,
+    required this.aoSelecionar,
+  });
+
+  final String rotulo;
+  final int quantidade;
+  final bool selecionado;
+  final VoidCallback aoSelecionar;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      selected: selecionado,
+      onSelected: (_) => aoSelecionar(),
+      showCheckmark: false,
+      label: Text('$rotulo  $quantidade'),
+      selectedColor: AppColors.champagne,
+      backgroundColor: Colors.white,
+      side: BorderSide(
+        color: selecionado ? AppColors.ouro : AppColors.texto.withValues(alpha: 0.08),
+      ),
+      labelStyle: TextStyle(
+        color: selecionado ? AppColors.texto : AppColors.texto.withValues(alpha: 0.72),
+        fontWeight: selecionado ? FontWeight.w700 : FontWeight.w500,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    );
+  }
+}
+
 class _EstadoVazioClientes extends StatelessWidget {
-  const _EstadoVazioClientes();
+  const _EstadoVazioClientes({this.buscaOuFiltro = false});
+
+  final bool buscaOuFiltro;
 
   @override
   Widget build(BuildContext context) {
@@ -266,12 +365,16 @@ class _EstadoVazioClientes extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              'Nenhum cliente cadastrado',
+              buscaOuFiltro ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado',
               style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
-              'Adicione o primeiro cliente para começar.',
+              buscaOuFiltro
+                  ? 'Ajuste a busca ou escolha outro filtro.'
+                  : 'Adicione o primeiro cliente para começar.',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.texto.withValues(alpha: 0.55),
               ),

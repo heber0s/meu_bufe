@@ -14,21 +14,35 @@ class ClientesController extends GetxController {
   final busca = ''.obs;
   final carregando = true.obs;
   final salvando = false.obs;
+  final filtroOrcamentos = 'todos'.obs;
+  final orcamentosPorCliente = <int, int>{}.obs;
 
   StreamSubscription<List<Cliente>>? _subscription;
+  StreamSubscription<List<Orcamento>>? _orcamentosSubscription;
 
-  /// Lista filtrada pela busca. Como lê `clientes` e `busca` (ambos
-  /// reativos), o Obx da view reconstrói quando qualquer um muda.
+  int get quantidadeComOrcamento =>
+      clientes.where((cliente) => orcamentosDoCliente(cliente.id) > 0).length;
+
+  int get quantidadeSemOrcamento => clientes.length - quantidadeComOrcamento;
+
+  int orcamentosDoCliente(int clienteId) =>
+      orcamentosPorCliente[clienteId] ?? 0;
+
+  /// Busca por contato e segmentação reativa por vínculo com orçamentos.
   List<Cliente> get clientesFiltrados {
     final termo = _normalizar(busca.value);
-    final todos = clientes.toList();
+    final filtro = filtroOrcamentos.value;
 
-    if (termo.isEmpty) return todos;
-
-    return todos.where((c) {
-      return _normalizar(c.nome).contains(termo) ||
-          _normalizar(c.telefone ?? '').contains(termo) ||
-          _normalizar(c.email ?? '').contains(termo);
+    return clientes.where((cliente) {
+      final combinaBusca = termo.isEmpty ||
+          _normalizar(cliente.nome).contains(termo) ||
+          _normalizar(cliente.telefone ?? '').contains(termo) ||
+          _normalizar(cliente.email ?? '').contains(termo);
+      final possuiOrcamento = orcamentosDoCliente(cliente.id) > 0;
+      final combinaFiltro = filtro == 'todos' ||
+          (filtro == 'com_orcamento' && possuiOrcamento) ||
+          (filtro == 'sem_orcamento' && !possuiOrcamento);
+      return combinaBusca && combinaFiltro;
     }).toList();
   }
 
@@ -54,11 +68,31 @@ class ClientesController extends GetxController {
         );
       },
     );
+
+    _orcamentosSubscription = db.select(db.orcamentos).watch().listen(
+      (lista) {
+        final contagens = <int, int>{};
+        for (final orcamento in lista) {
+          contagens.update(
+            orcamento.clienteId,
+            (quantidade) => quantidade + 1,
+            ifAbsent: () => 1,
+          );
+        }
+        orcamentosPorCliente.assignAll(contagens);
+      },
+      onError: (_) => Get.snackbar(
+        'Erro',
+        'Não foi possível atualizar os vínculos dos orçamentos.',
+        snackPosition: SnackPosition.BOTTOM,
+      ),
+    );
   }
 
   @override
   void onClose() {
     _subscription?.cancel();
+    _orcamentosSubscription?.cancel();
     super.onClose();
   }
 
