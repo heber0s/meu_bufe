@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
-import 'package:get/get.dart';
+import 'package:flutter/material.dart' show Colors;
+import 'package:get/get.dart' hide Value;
 
 import '../../data/database/app_database.dart';
 import '../orcamentos/orcamento_totais.dart';
+import 'cliente_form_sheet.dart';
 
 class OrcamentoClienteResumo {
   const OrcamentoClienteResumo({
@@ -120,6 +122,50 @@ class ClienteDetalheController extends GetxController {
       if (versao == _versaoCarga) erro.value = true;
     } finally {
       if (versao == _versaoCarga) carregando.value = false;
+    }
+  }
+
+  Future<void> editarCliente() async {
+    final clienteAtual = cliente.value;
+    if (clienteAtual == null) return;
+
+    final resultado = await Get.bottomSheet<ClienteFormResultado>(
+      ClienteFormSheet(
+        editando: true,
+        nome: clienteAtual.nome,
+        telefone: clienteAtual.telefone ?? '',
+        email: clienteAtual.email ?? '',
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
+
+    if (resultado == null) return;
+
+    try {
+      await (db.update(db.clientes)
+            ..where((c) => c.id.equals(clienteAtual.id)))
+          .write(
+        ClientesCompanion(
+          nome: Value(resultado.nome),
+          telefone: Value(
+            resultado.telefone.isEmpty ? null : resultado.telefone,
+          ),
+          email: Value(resultado.email.isEmpty ? null : resultado.email),
+        ),
+      );
+
+      Get.snackbar(
+        'Cliente atualizado',
+        'Os dados de ${resultado.nome} foram salvos.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Erro',
+        'Não foi possível atualizar os dados do cliente.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 

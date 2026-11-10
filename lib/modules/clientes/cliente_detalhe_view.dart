@@ -66,6 +66,7 @@ class ClienteDetalheView extends GetView<ClienteDetalheController> {
                     nome: cliente.nome,
                     telefone: cliente.telefone,
                     email: cliente.email,
+                    onEditar: controller.editarCliente,
                   ),
                 ),
               ),
@@ -139,11 +140,13 @@ class _CartaoCliente extends StatelessWidget {
     required this.nome,
     required this.telefone,
     required this.email,
+    required this.onEditar,
   });
 
   final String nome;
   final String? telefone;
   final String? email;
+  final VoidCallback onEditar;
 
   @override
   Widget build(BuildContext context) {
@@ -197,6 +200,13 @@ class _CartaoCliente extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Editar dados do cliente',
+            onPressed: onEditar,
+            icon: const Icon(Icons.edit_outlined),
+            color: AppColors.roseGold,
           ),
         ],
       ),
