@@ -113,11 +113,16 @@ class _ResumoRetornos extends StatelessWidget {
               icone: Icons.notification_important_outlined,
             ),
           ),
-          Container(
-            width: 1,
-            height: 48,
-            color: AppColors.texto.withValues(alpha: 0.1),
+          _divisorResumo(),
+          Expanded(
+            child: _ContagemRetorno(
+              titulo: 'Hoje',
+              valor: controller.quantidadeHoje,
+              cor: AppColors.roseGold,
+              icone: Icons.today_rounded,
+            ),
           ),
+          _divisorResumo(),
           Expanded(
             child: _ContagemRetorno(
               titulo: 'Próximos',
@@ -131,6 +136,13 @@ class _ResumoRetornos extends StatelessWidget {
     );
   }
 }
+
+Widget _divisorResumo() => Container(
+      width: 1,
+      height: 58,
+      margin: const EdgeInsets.symmetric(horizontal: 5),
+      color: AppColors.texto.withValues(alpha: 0.1),
+    );
 
 class _ContagemRetorno extends StatelessWidget {
   const _ContagemRetorno({
@@ -147,41 +159,39 @@ class _ContagemRetorno extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(
             color: cor.withValues(alpha: 0.13),
-            borderRadius: BorderRadius.circular(13),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icone, color: cor, size: 20),
+          child: Icon(icone, color: cor, size: 18),
         ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$valor',
-              style: TextStyle(
-                fontSize: 20,
-                height: 1,
-                fontWeight: FontWeight.w800,
-                color: cor,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              titulo,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.texto,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+        const SizedBox(height: 6),
+        Text(
+          '$valor',
+          style: TextStyle(
+            fontSize: 19,
+            height: 1,
+            fontWeight: FontWeight.w800,
+            color: cor,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          titulo,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.texto,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -201,6 +211,7 @@ class _FiltrosRetorno extends StatelessWidget {
           children: [
             _filtro('Todos', FiltroRetorno.todos),
             _filtro('Atrasados', FiltroRetorno.atrasados),
+            _filtro('Hoje', FiltroRetorno.hoje),
             _filtro('Próximos', FiltroRetorno.proximos),
           ],
         ));
@@ -239,7 +250,16 @@ class _RetornoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cor = retorno.atrasado ? AppColors.terracota : AppColors.sage;
+    final cor = retorno.atrasado
+        ? AppColors.terracota
+        : retorno.hoje
+            ? AppColors.roseGold
+            : AppColors.sage;
+    final etiqueta = retorno.atrasado
+        ? 'Atrasado'
+        : retorno.hoje
+            ? 'Hoje'
+            : 'Agendado';
     return Material(
       color: AppColors.superficie,
       borderRadius: BorderRadius.circular(20),
@@ -298,7 +318,7 @@ class _RetornoCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: Text(
-                      retorno.atrasado ? 'Atrasado' : 'Agendado',
+                      etiqueta,
                       style: TextStyle(
                         color: cor,
                         fontSize: 10,

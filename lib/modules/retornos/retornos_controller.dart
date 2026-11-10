@@ -5,7 +5,7 @@ import '../../data/database/app_database.dart';
 import '../../routes/app_routes.dart';
 
 // Filtros disponíveis na central de retornos.
-enum FiltroRetorno { todos, atrasados, proximos }
+enum FiltroRetorno { todos, atrasados, hoje, proximos }
 
 class RetornoOrcamento {
   const RetornoOrcamento({
@@ -28,7 +28,19 @@ class RetornoOrcamento {
   final DateTime contatoEm;
   final DateTime quando;
 
-  bool get atrasado => quando.isBefore(DateTime.now());
+  bool get hoje {
+    final agora = DateTime.now();
+    return quando.year == agora.year &&
+        quando.month == agora.month &&
+        quando.day == agora.day;
+  }
+
+  bool get atrasado {
+    final agora = DateTime.now();
+    final dataRetorno = DateTime(quando.year, quando.month, quando.day);
+    final dataHoje = DateTime(agora.year, agora.month, agora.day);
+    return dataRetorno.isBefore(dataHoje);
+  }
 
   factory RetornoOrcamento.fromRow(QueryRow row) {
     return RetornoOrcamento(
@@ -63,15 +75,19 @@ class RetornosController extends GetxController {
     switch (filtro.value) {
       case FiltroRetorno.atrasados:
         return lista.where((item) => item.atrasado).toList();
+      case FiltroRetorno.hoje:
+        return lista.where((item) => item.hoje).toList();
       case FiltroRetorno.proximos:
-        return lista.where((item) => !item.atrasado).toList();
+        return lista.where((item) => !item.atrasado && !item.hoje).toList();
       case FiltroRetorno.todos:
         return lista;
     }
   }
 
   int get quantidadeAtrasados => retornos.where((item) => item.atrasado).length;
-  int get quantidadeProximos => retornos.length - quantidadeAtrasados;
+  int get quantidadeHoje => retornos.where((item) => item.hoje).length;
+  int get quantidadeProximos =>
+      retornos.where((item) => !item.atrasado && !item.hoje).length;
 
   @override
   void onInit() {
