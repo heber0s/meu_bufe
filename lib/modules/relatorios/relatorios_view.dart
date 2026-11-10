@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import 'relatorios_controller.dart';
+import 'relatorios_export_service.dart';
 
 class RelatoriosView extends GetView<RelatoriosController> {
   const RelatoriosView({super.key});
@@ -15,7 +16,51 @@ class RelatoriosView extends GetView<RelatoriosController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Relatórios')),
+      appBar: AppBar(
+        title: const Text('Relatórios'),
+        actions: [
+          Obx(() {
+            final ocupada = controller.exportando.value;
+            return PopupMenuButton<FormatoRelatorioExportacao>(
+              enabled: controller.orcamentos.isNotEmpty && !ocupada,
+              tooltip: 'Exportar relatório',
+              icon: ocupada
+                  ? const SizedBox(
+                      width: 21,
+                      height: 21,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.roseGold,
+                      ),
+                    )
+                  : const Icon(Icons.ios_share_rounded),
+              onSelected: (formato) => _exportar(formato),
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: FormatoRelatorioExportacao.pdf,
+                  child: Row(
+                    children: [
+                      Icon(Icons.picture_as_pdf_outlined),
+                      SizedBox(width: 10),
+                      Text('Compartilhar PDF'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: FormatoRelatorioExportacao.csv,
+                  child: Row(
+                    children: [
+                      Icon(Icons.table_chart_outlined),
+                      SizedBox(width: 10),
+                      Text('Compartilhar CSV'),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
       body: Obx(() {
         if (controller.carregando.value) {
           return const Center(
@@ -146,6 +191,32 @@ class RelatoriosView extends GetView<RelatoriosController> {
         );
       }),
     );
+  }
+
+  Future<void> _exportar(FormatoRelatorioExportacao formato) async {
+    if (controller.exportando.value) return;
+    controller.exportando.value = true;
+    try {
+      final service = RelatoriosExportService();
+      if (formato == FormatoRelatorioExportacao.pdf) {
+        await service.compartilharPdf(controller);
+      } else {
+        await service.compartilharCsv(controller);
+      }
+      Get.snackbar(
+        'Relatório preparado',
+        'Escolha um aplicativo para compartilhar ou salvar o arquivo.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Não foi possível exportar',
+        'Tente novamente. Se o problema continuar, feche e reabra os relatórios.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      controller.exportando.value = false;
+    }
   }
 
   static String _formatarMoeda(int centavos) =>

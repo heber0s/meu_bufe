@@ -53,6 +53,7 @@ class RelatoriosController extends GetxController {
 
   final orcamentos = <OrcamentoRelatorio>[].obs;
   final carregando = true.obs;
+  final exportando = false.obs;
   final periodoSelecionado = PeriodoRelatorio.todos.obs;
   DateTime? _inicioPersonalizado;
   DateTime? _fimPersonalizado;
