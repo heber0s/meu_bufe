@@ -135,6 +135,13 @@ class ClienteDetalheController extends GetxController {
         nome: clienteAtual.nome,
         telefone: clienteAtual.telefone ?? '',
         email: clienteAtual.email ?? '',
+        validarDuplicidade: ({required telefone, required email}) {
+          return _verificarDuplicidade(
+            telefone: telefone,
+            email: email,
+            clienteId: clienteAtual.id,
+          );
+        },
       ),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -168,6 +175,47 @@ class ClienteDetalheController extends GetxController {
       );
     }
   }
+
+  Future<ClienteDuplicidade> _verificarDuplicidade({
+    required String telefone,
+    required String email,
+    required int clienteId,
+  }) async {
+    final telefoneNormalizado = _normalizarTelefone(telefone);
+    final emailNormalizado = email.trim().toLowerCase();
+
+    if (telefoneNormalizado.isEmpty && emailNormalizado.isEmpty) {
+      return const ClienteDuplicidade();
+    }
+
+    final registros = await db.select(db.clientes).get();
+    var telefoneDuplicado = false;
+    var emailDuplicado = false;
+
+    for (final registro in registros) {
+      if (registro.id == clienteId) continue;
+
+      if (telefoneNormalizado.isNotEmpty &&
+          _normalizarTelefone(registro.telefone ?? '') == telefoneNormalizado) {
+        telefoneDuplicado = true;
+      }
+
+      if (emailNormalizado.isNotEmpty &&
+          (registro.email ?? '').trim().toLowerCase() == emailNormalizado) {
+        emailDuplicado = true;
+      }
+
+      if (telefoneDuplicado && emailDuplicado) break;
+    }
+
+    return ClienteDuplicidade(
+      telefone: telefoneDuplicado,
+      email: emailDuplicado,
+    );
+  }
+
+  String _normalizarTelefone(String telefone) =>
+      telefone.replaceAll(RegExp(r'\D'), '');
 
   @override
   void onClose() {

@@ -3,6 +3,18 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 
+class ClienteDuplicidade {
+  const ClienteDuplicidade({this.telefone = false, this.email = false});
+
+  final bool telefone;
+  final bool email;
+}
+
+typedef ClienteDuplicidadeValidator = Future<ClienteDuplicidade> Function({
+  required String telefone,
+  required String email,
+});
+
 class ClienteFormResultado {
   const ClienteFormResultado({
     required this.nome,
@@ -22,12 +34,14 @@ class ClienteFormSheet extends StatefulWidget {
     this.telefone = '',
     this.email = '',
     this.editando = false,
+    required this.validarDuplicidade,
   });
 
   final String nome;
   final String telefone;
   final String email;
   final bool editando;
+  final ClienteDuplicidadeValidator validarDuplicidade;
 
   @override
   State<ClienteFormSheet> createState() => _ClienteFormSheetState();
@@ -35,6 +49,10 @@ class ClienteFormSheet extends StatefulWidget {
 
 class _ClienteFormSheetState extends State<ClienteFormSheet> {
   final _formKey = GlobalKey<FormState>();
+
+  bool _validando = false;
+  String? _erroTelefoneDuplicado;
+  String? _erroEmailDuplicado;
 
   late final TextEditingController _nome;
   late final TextEditingController _telefone;
@@ -58,18 +76,55 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
     super.dispose();
   }
 
-  void _confirmar() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _confirmar() async {
+    if (_validando || !(_formKey.currentState?.validate() ?? false)) return;
 
-    FocusScope.of(context).unfocus();
+    setState(() {
+      _erroTelefoneDuplicado = null;
+      _erroEmailDuplicado = null;
+      _validando = true;
+    });
 
-    Navigator.of(context).pop(
-      ClienteFormResultado(
-        nome: _nome.text.trim(),
+    try {
+      final duplicidade = await widget.validarDuplicidade(
         telefone: _telefone.text.trim(),
         email: _email.text.trim(),
-      ),
-    );
+      );
+
+      if (!mounted) return;
+
+      if (duplicidade.telefone || duplicidade.email) {
+        setState(() {
+          _erroTelefoneDuplicado = duplicidade.telefone
+              ? 'Este telefone já está cadastrado para outro cliente'
+              : null;
+          _erroEmailDuplicado = duplicidade.email
+              ? 'Este e-mail já está cadastrado para outro cliente'
+              : null;
+        });
+        _formKey.currentState?.validate();
+        return;
+      }
+
+      FocusScope.of(context).unfocus();
+      Navigator.of(context).pop(
+        ClienteFormResultado(
+          nome: _nome.text.trim(),
+          telefone: _telefone.text.trim(),
+          email: _email.text.trim(),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível verificar os dados do cliente.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _validando = false);
+    }
   }
 
   InputDecoration _decoracao(String rotulo, IconData icone) {
@@ -180,6 +235,12 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
                     inputFormatters: [const _TelefoneInputFormatter()],
+                    onChanged: (_) {
+                      if (_erroTelefoneDuplicado != null) {
+                        setState(() => _erroTelefoneDuplicado = null);
+                      }
+                    },
+                    validator: (_) => _erroTelefoneDuplicado,
                     decoration: _decoracao(
                       'Telefone',
                       Icons.phone_outlined,
@@ -191,11 +252,20 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _confirmar(),
+                    onChanged: (_) {
+                      if (_erroEmailDuplicado != null) {
+                        setState(() => _erroEmailDuplicado = null);
+                      }
+                    },
                     decoration: _decoracao(
                       'E-mail',
                       Icons.email_outlined,
                     ),
                     validator: (valor) {
+                      if (_erroEmailDuplicado != null) {
+                        return _erroEmailDuplicado;
+                      }
+
                       final texto = valor?.trim() ?? '';
                       if (texto.isEmpty) return null;
 
@@ -225,7 +295,7 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
                       Expanded(
                         flex: 2,
                         child: FilledButton(
-                          onPressed: _confirmar,
+                          onPressed: _validando ? null : _confirmar,
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.ouro,
                             foregroundColor: Colors.white,
@@ -237,7 +307,9 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
                             ),
                           ),
                           child: Text(
-                            widget.editando ? 'Salvar' : 'Cadastrar',
+                            _validando
+                                ? 'Verificando...'
+                                : (widget.editando ? 'Salvar' : 'Cadastrar'),
                           ),
                         ),
                       ),

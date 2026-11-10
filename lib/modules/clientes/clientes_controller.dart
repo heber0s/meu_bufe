@@ -106,6 +106,13 @@ class ClientesController extends GetxController {
         nome: cliente?.nome ?? '',
         telefone: cliente?.telefone ?? '',
         email: cliente?.email ?? '',
+        validarDuplicidade: ({required telefone, required email}) {
+          return _verificarDuplicidade(
+            telefone: telefone,
+            email: email,
+            clienteId: cliente?.id,
+          );
+        },
       ),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -116,11 +123,72 @@ class ClientesController extends GetxController {
     await _salvar(resultado, cliente);
   }
 
+  Future<ClienteDuplicidade> _verificarDuplicidade({
+    required String telefone,
+    required String email,
+    int? clienteId,
+  }) async {
+    final telefoneNormalizado = _normalizarTelefone(telefone);
+    final emailNormalizado = email.trim().toLowerCase();
+
+    if (telefoneNormalizado.isEmpty && emailNormalizado.isEmpty) {
+      return const ClienteDuplicidade();
+    }
+
+    // Consulta a base novamente para não depender do instante de atualização
+    // do stream da lista, principalmente quando o formulário fica aberto.
+    final registros = await db.select(db.clientes).get();
+    var telefoneDuplicado = false;
+    var emailDuplicado = false;
+
+    for (final registro in registros) {
+      if (clienteId != null && registro.id == clienteId) continue;
+
+      if (telefoneNormalizado.isNotEmpty &&
+          _normalizarTelefone(registro.telefone ?? '') == telefoneNormalizado) {
+        telefoneDuplicado = true;
+      }
+
+      if (emailNormalizado.isNotEmpty &&
+          (registro.email ?? '').trim().toLowerCase() == emailNormalizado) {
+        emailDuplicado = true;
+      }
+
+      if (telefoneDuplicado && emailDuplicado) break;
+    }
+
+    return ClienteDuplicidade(
+      telefone: telefoneDuplicado,
+      email: emailDuplicado,
+    );
+  }
+
   Future<void> _salvar(ClienteFormResultado dados, Cliente? existente) async {
     if (salvando.value) return;
     salvando.value = true;
 
     try {
+      // Revalida antes de gravar para cobrir alterações feitas enquanto o
+      // formulário estava aberto. Na edição, o próprio cliente é ignorado.
+      final duplicidade = await _verificarDuplicidade(
+        telefone: dados.telefone,
+        email: dados.email,
+        clienteId: existente?.id,
+      );
+
+      if (duplicidade.telefone || duplicidade.email) {
+        final campos = <String>[
+          if (duplicidade.telefone) 'telefone',
+          if (duplicidade.email) 'e-mail',
+        ].join(' e ');
+        Get.snackbar(
+          'Contato já cadastrado',
+          'Já existe outro cliente usando este $campos.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
       // Campo vazio vira null, para o cartão não exibir linhas em branco.
       final companion = ClientesCompanion(
         nome: Value(dados.nome),
@@ -186,6 +254,9 @@ class ClientesController extends GetxController {
       );
     }
   }
+
+  String _normalizarTelefone(String telefone) =>
+      telefone.replaceAll(RegExp(r'\D'), '');
 
   /// Minúsculas e sem acentos, para a busca não depender disso.
   String _normalizar(String texto) {
