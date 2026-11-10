@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 
@@ -43,7 +44,9 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
   void initState() {
     super.initState();
     _nome = TextEditingController(text: widget.nome);
-    _telefone = TextEditingController(text: widget.telefone);
+    _telefone = TextEditingController(
+      text: _formatarTelefone(widget.telefone.replaceAll(RegExp(r'\D'), '')),
+    );
     _email = TextEditingController(text: widget.email);
   }
 
@@ -176,10 +179,11 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
                     controller: _telefone,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
+                    inputFormatters: [const _TelefoneInputFormatter()],
                     decoration: _decoracao(
                       'Telefone',
                       Icons.phone_outlined,
-                    ),
+                    ).copyWith(hintText: '(11) 99999-9999'),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -247,4 +251,116 @@ class _ClienteFormSheetState extends State<ClienteFormSheet> {
       ),
     );
   }
+
+  static String _formatarTelefone(String digitos) {
+    final numero = digitos.length > 11 ? digitos.substring(0, 11) : digitos;
+    if (numero.isEmpty) return '';
+
+    if (numero.length <= 2) {
+      return numero.length == 2 ? '($numero) ' : '($numero';
+    }
+
+    final ddd = numero.substring(0, 2);
+    final restante = numero.substring(2);
+    final tamanhoPrefixo = numero.length > 10 ? 5 : 4;
+    final base = '($ddd) ';
+
+    if (restante.length <= tamanhoPrefixo) {
+      return '$base$restante';
+    }
+
+    return '$base${restante.substring(0, tamanhoPrefixo)}-'
+        '${restante.substring(tamanhoPrefixo)}';
+  }
 }
+
+class _TelefoneInputFormatter extends TextInputFormatter {
+  const _TelefoneInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final oldDigits = oldValue.text.replaceAll(RegExp(r'\D'), '');
+    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final cursorOffset = newValue.selection.extentOffset
+        .clamp(0, newValue.text.length)
+        .toInt();
+    var digitsBeforeCursor = newValue.text
+        .substring(0, cursorOffset)
+        .replaceAll(RegExp(r'\D'), '')
+        .length;
+
+    // Se o usuário apaga um separador da máscara, remove também o dígito
+    // adjacente. Assim o cursor não fica preso nos parênteses ou no espaço
+    // do DDD, impedindo que ele seja corrigido com a tecla de apagar.
+    if (newValue.text.length < oldValue.text.length &&
+        digits.length == oldDigits.length) {
+      var prefixLength = 0;
+      while (prefixLength < oldValue.text.length &&
+          prefixLength < newValue.text.length &&
+          oldValue.text[prefixLength] == newValue.text[prefixLength]) {
+        prefixLength++;
+      }
+
+      var suffixLength = 0;
+      while (suffixLength < oldValue.text.length - prefixLength &&
+          suffixLength < newValue.text.length - prefixLength &&
+          oldValue.text[oldValue.text.length - 1 - suffixLength] ==
+              newValue.text[newValue.text.length - 1 - suffixLength]) {
+        suffixLength++;
+      }
+
+      final removido = oldValue.text.substring(
+        prefixLength,
+        oldValue.text.length - suffixLength,
+      );
+
+      if (removido.isNotEmpty && !RegExp(r'\d').hasMatch(removido)) {
+        final digitsBeforeDeletion = oldValue.text
+            .substring(0, prefixLength)
+            .replaceAll(RegExp(r'\D'), '')
+            .length;
+        final indexToRemove = digitsBeforeDeletion > 0
+            ? digitsBeforeDeletion - 1
+            : 0;
+
+        if (digits.isNotEmpty && indexToRemove < digits.length) {
+          digits = digits.replaceRange(indexToRemove, indexToRemove + 1, '');
+          digitsBeforeCursor = indexToRemove;
+        }
+      }
+    }
+
+    if (digits.length > 11) digits = digits.substring(0, 11);
+    if (digitsBeforeCursor > digits.length) {
+      digitsBeforeCursor = digits.length;
+    }
+
+    final formatted = _ClienteFormSheetState._formatarTelefone(digits);
+    final offset = _cursorOffset(formatted, digitsBeforeCursor);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: offset),
+    );
+  }
+
+  int _cursorOffset(String text, int digitsBeforeCursor) {
+    if (digitsBeforeCursor <= 0) return 0;
+    if (digitsBeforeCursor == text.replaceAll(RegExp(r'\D'), '').length) {
+      return text.length;
+    }
+
+    var digitsFound = 0;
+    for (var index = 0; index < text.length; index++) {
+      if (RegExp(r'\d').hasMatch(text[index])) {
+        digitsFound++;
+        if (digitsFound == digitsBeforeCursor) return index + 1;
+      }
+    }
+    return text.length;
+  }
+}
+
