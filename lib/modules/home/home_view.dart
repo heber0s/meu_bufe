@@ -157,12 +157,6 @@ class _MenuRecursosSheet extends StatelessWidget {
       titulo: 'SEU BUFÊ',
       recursos: [
         _RecursoHome(
-          titulo: 'Catálogo',
-          descricao: 'Produtos e opções do cardápio',
-          icone: Icons.grid_view_rounded,
-          rota: Routes.catalogo,
-        ),
-        _RecursoHome(
           titulo: 'Receitas',
           descricao: 'Consulte e organize receitas',
           icone: Icons.menu_book_outlined,
