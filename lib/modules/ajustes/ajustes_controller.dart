@@ -45,16 +45,40 @@ class AjustesController extends GetxController {
     super.onClose();
   }
 
-  /// Só altera o campo se o texto for diferente, para não mexer no cursor
+  /// Só altera o campo se o texto for diferente, para não mexer no cursor.
   void _preencherCampos() {
     void definir(TextEditingController c, String valor) {
       if (c.text != valor) c.text = valor;
     }
 
     definir(nomeCtrl, _empresa.nome.value);
-    definir(telefoneCtrl, _empresa.telefone.value);
+    definir(
+      telefoneCtrl,
+      _formatarTelefone(_empresa.telefone.value.replaceAll(RegExp(r'\D'), '')),
+    );
     definir(emailCtrl, _empresa.email.value);
     definir(validadeCtrl, '${_empresa.validadeDias.value}');
+  }
+
+  static String _formatarTelefone(String digitos) {
+    final numero = digitos.length > 11 ? digitos.substring(0, 11) : digitos;
+    if (numero.isEmpty) return '';
+
+    if (numero.length <= 2) {
+      return numero.length == 2 ? '($numero) ' : '($numero';
+    }
+
+    final ddd = numero.substring(0, 2);
+    final restante = numero.substring(2);
+    final tamanhoPrefixo = numero.length > 10 ? 5 : 4;
+    final base = '($ddd) ';
+
+    if (restante.length <= tamanhoPrefixo) {
+      return '$base$restante';
+    }
+
+    return '$base${restante.substring(0, tamanhoPrefixo)}-'
+        '${restante.substring(tamanhoPrefixo)}';
   }
 
   // ===================== Dados do bufê =====================
