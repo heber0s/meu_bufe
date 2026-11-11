@@ -12,6 +12,8 @@ import '../../core/services/orcamento_pdf_service.dart';
 import '../../core/services/notificacao_service.dart';
 import '../../core/services/receita_orcamento_service.dart';
 import '../../data/database/app_database.dart';
+import '../../routes/app_routes.dart';
+import 'orcamento_copia_dialog.dart';
 import 'widgets/orcamento_item_editor.dart';
 
 class OrcamentoAcompanhamento {
@@ -438,6 +440,234 @@ class OrcamentoDetalheController extends GetxController {
         );
       },
     );
+  }
+
+  /// Cria uma nova proposta independente com os mesmos itens e abre o editor.
+  Future<void> copiarOrcamento() async {
+    if (processando.value || salvando.value) return;
+
+    final original = orcamento.value;
+    if (original == null) {
+      _mostrarMensagemOrcamentoIndisponivel();
+      return;
+    }
+
+    processando.value = true;
+    try {
+      final dados = await Get.dialog<OrcamentoCopiaDados>(
+        OrcamentoCopiaDialog(orcamento: original),
+        barrierDismissible: false,
+      );
+      if (dados == null) return;
+
+      final itensOriginais = await (db.select(db.orcamentoItens)
+            ..where((item) => item.orcamentoId.equals(original.id))
+            ..orderBy([(item) => OrderingTerm.asc(item.id)]))
+          .get();
+      final receitasOriginais = await (db.select(db.orcamentoReceitas)
+            ..where((receita) => receita.orcamentoId.equals(original.id)))
+          .get();
+
+      final receitaIds = receitasOriginais
+          .map((receita) => receita.receitaId)
+          .toSet()
+          .toList();
+      final receitasCatalogo = receitaIds.isEmpty
+          ? <Receita>[]
+          : await (db.select(db.receitas)
+                ..where((receita) => receita.id.isIn(receitaIds)))
+              .get();
+      final rendimentoPorReceita = <int, int>{
+        for (final receita in receitasCatalogo)
+          if (receita.rendimentoPessoas > 0)
+            receita.id: receita.rendimentoPessoas,
+      };
+
+      final ingredienteIds = itensOriginais
+          .map((item) => item.receitaIngredienteId)
+          .whereType<int>()
+          .toSet()
+          .toList();
+      final ingredientesCatalogo = ingredienteIds.isEmpty
+          ? <ReceitaIngrediente>[]
+          : await (db.select(db.receitaIngredientes)
+                ..where((ingrediente) => ingrediente.id.isIn(ingredienteIds)))
+              .get();
+      final ingredientePorId = <int, ReceitaIngrediente>{
+        for (final ingrediente in ingredientesCatalogo)
+          ingrediente.id: ingrediente,
+      };
+
+      final convidadosBasePorReceita = <int, int>{};
+      for (final receita in receitasOriginais) {
+        convidadosBasePorReceita.putIfAbsent(
+          receita.receitaId,
+          () => receita.convidadosNoMomento,
+        );
+      }
+
+      int redimensionar(int valor, int convidadosBase) {
+        if (convidadosBase <= 0) return valor;
+        return (valor * dados.convidados / convidadosBase).round();
+      }
+
+      int calcularPeloRendimento(int valor, int rendimentoPessoas) {
+        if (rendimentoPessoas <= 0) return valor;
+        return (valor * dados.convidados / rendimentoPessoas).round();
+      }
+
+      int calcularFatorDaReceita(int rendimentoPessoas) {
+        if (rendimentoPessoas <= 0) return 1000;
+        return (dados.convidados * 1000 / rendimentoPessoas).round();
+      }
+
+      int convidadosBaseDoItem(OrcamentoIten item) {
+        final receitaId = item.receitaId;
+        if (receitaId == null) return 0;
+        final convidadosNoMomento = convidadosBasePorReceita[receitaId];
+        if (convidadosNoMomento != null && convidadosNoMomento > 0) {
+          return convidadosNoMomento;
+        }
+        return original.convidados;
+      }
+      
+      final novoId = await db.transaction(() async {
+        final id = await db.into(db.orcamentos).insert(
+              OrcamentosCompanion.insert(
+                clienteId: original.clienteId,
+                titulo: dados.titulo,
+                dataEvento: dados.dataEvento,
+                local: Value(dados.local.isEmpty ? null : dados.local),
+                convidados: Value(dados.convidados),
+                descontoCentavos: Value(original.descontoCentavos),
+                ingredientesCompradosPeloBufe:
+                    Value(original.ingredientesCompradosPeloBufe),
+                observacoes: Value(original.observacoes),
+                status: const Value('pendente'),
+              ),
+            );
+
+        for (final item in itensOriginais) {
+          final receitaId = item.receitaId;
+          final rendimento = receitaId == null
+              ? null
+              : rendimentoPorReceita[receitaId];
+          final ingredienteId = item.receitaIngredienteId;
+          final ingrediente = ingredienteId == null
+              ? null
+              : ingredientePorId[ingredienteId];
+          final convidadosBase = convidadosBaseDoItem(item);
+          final veioDeReceita = item.receitaId != null && convidadosBase > 0;
+          final novaQuantidadeMilesimos =
+              ingrediente != null &&
+                      rendimento != null &&
+                      receitaId != null &&
+                      ingrediente.receitaId == receitaId
+                  ? calcularPeloRendimento(
+                      ingrediente.quantidadeMilesimos,
+                      rendimento,
+                    )
+                  : veioDeReceita
+                      ? redimensionar(
+                          item.quantidadeMilesimos,
+                          convidadosBase,
+                        )
+                      : item.quantidadeMilesimos;
+          final novoPrecoCentavos =
+              ingrediente != null &&
+                      rendimento != null &&
+                      receitaId != null &&
+                      ingrediente.receitaId == receitaId
+                  ? calcularPeloRendimento(
+                      ingrediente.precoCentavos ?? 0,
+                      rendimento,
+                    )
+                  : veioDeReceita
+                      ? redimensionar(item.precoCentavos, convidadosBase)
+                      : item.precoCentavos;
+
+          await db.into(db.orcamentoItens).insert(
+                OrcamentoItensCompanion.insert(
+                  orcamentoId: id,
+                  nome: item.nome,
+                  quantidade: Value(item.quantidade),
+                  precoCentavos: Value(novoPrecoCentavos),
+                  tipoCobranca: Value(item.tipoCobranca),
+                  categoria: Value(item.categoria),
+                  receitaId: Value(item.receitaId),
+                  receitaIngredienteId: Value(item.receitaIngredienteId),
+                  receitaNome: Value(item.receitaNome),
+                  unidade: Value(item.unidade),
+                  quantidadeMilesimos: Value(novaQuantidadeMilesimos),
+                  servicoId: Value(item.servicoId),
+                ),
+              );
+        }
+
+        for (final receita in receitasOriginais) {
+          await db.into(db.orcamentoReceitas).insert(
+                OrcamentoReceitasCompanion.insert(
+                  orcamentoId: id,
+                  receitaId: receita.receitaId,
+                  fatorMilesimos: rendimentoPorReceita[receita.receitaId] != null
+                      ? calcularFatorDaReceita(
+                          rendimentoPorReceita[receita.receitaId]!,
+                        )
+                      : receita.convidadosNoMomento > 0
+                          ? redimensionar(
+                              receita.fatorMilesimos,
+                              receita.convidadosNoMomento,
+                            )
+                          : receita.fatorMilesimos,
+                  convidadosNoMomento: dados.convidados,
+                ),
+              );
+        }
+
+        await db.customStatement(
+          '''
+          INSERT INTO orcamento_historico
+            (orcamento_id, ocorrido_em, tipo, campo, valor_anterior,
+             valor_novo, autor)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            id,
+            DateTime.now().millisecondsSinceEpoch,
+            'Orçamento copiado',
+            'Origem',
+            'Orçamento #${original.id} · ${original.titulo}',
+            '${dados.titulo} · ${itensOriginais.length} itens',
+            'Usuário local',
+          ],
+        );
+
+        return id;
+      });
+
+      Get.snackbar(
+        'Orçamento copiado',
+        'A cópia foi criada com ${itensOriginais.length} itens. '
+            'Você já pode editar os dados e os produtos.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      final salvo = await Get.toNamed<dynamic>(
+        Routes.orcamentoForm,
+        arguments: novoId,
+      );
+      if (salvo == true) {
+        await Get.offNamed<void>(Routes.detalhe(novoId));
+      }
+    } catch (_) {
+      Get.snackbar(
+        'Erro ao copiar orçamento',
+        'Não foi possível criar a cópia. O orçamento original foi mantido.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      processando.value = false;
+    }
   }
 
   Future<void> salvarOrcamento() async {

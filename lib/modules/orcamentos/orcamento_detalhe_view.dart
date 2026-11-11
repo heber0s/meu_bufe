@@ -107,6 +107,7 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
               enabled: !ocupado,
               tooltip: 'Mais opções',
               onSelected: (valor) {
+                if (valor == 'copiar') controller.copiarOrcamento();
                 if (valor == 'pdf') controller.gerarEEnviarPdf();
                 if (valor == 'confirmar') controller.confirmarOrcamento();
                 if (valor == 'reabrir') controller.reabrirOrcamento();
@@ -117,6 +118,16 @@ class OrcamentoDetalheView extends GetView<OrcamentoDetalheController> {
                 }
               },
               itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'copiar',
+                  child: Row(
+                    children: [
+                      Icon(Icons.copy_all_outlined),
+                      SizedBox(width: 10),
+                      Text('Copiar orçamento'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'pdf',
                   child: Row(
