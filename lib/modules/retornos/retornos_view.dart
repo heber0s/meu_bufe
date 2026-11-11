@@ -105,18 +105,118 @@ class RetornosView extends GetView<RetornosController> {
                       : 'Não há retornos nesta categoria. Escolha outro filtro para conferir a lista.',
                 )
               else
-                for (final retorno in lista)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 11),
-                    child: _RetornoCard(
-                      retorno: retorno,
-                      controller: controller,
-                    ),
-                  ),
+                ..._construirSecoes(),
             ],
           ),
         );
       }),
+    );
+  }
+
+  List<Widget> _construirSecoes() {
+    final grupos = controller.retornosAgrupadosVisiveis;
+    final widgets = <Widget>[];
+
+    _adicionarSecao(
+      destino: widgets,
+      titulo: 'Atrasados',
+      retornos: grupos[FiltroRetorno.atrasados] ?? const [],
+      icone: Icons.notification_important_outlined,
+      cor: AppColors.terracota,
+      controller: controller,
+    );
+    _adicionarSecao(
+      destino: widgets,
+      titulo: 'Retornos de hoje',
+      retornos: grupos[FiltroRetorno.hoje] ?? const [],
+      icone: Icons.today_rounded,
+      cor: AppColors.roseGold,
+      controller: controller,
+    );
+    _adicionarSecao(
+      destino: widgets,
+      titulo: 'Próximos',
+      retornos: grupos[FiltroRetorno.proximos] ?? const [],
+      icone: Icons.notifications_active_outlined,
+      cor: AppColors.sage,
+      controller: controller,
+    );
+
+    return widgets;
+  }
+}
+
+void _adicionarSecao({
+  required List<Widget> destino,
+  required String titulo,
+  required List<RetornoOrcamento> retornos,
+  required IconData icone,
+  required Color cor,
+  required RetornosController controller,
+}) {
+  if (retornos.isEmpty) return;
+
+  destino.add(_CabecalhoSecaoRetorno(
+    titulo: titulo,
+    quantidade: retornos.length,
+    icone: icone,
+    cor: cor,
+  ));
+  destino.add(const SizedBox(height: 8));
+  for (final retorno in retornos) {
+    destino.add(Padding(
+      padding: const EdgeInsets.only(bottom: 11),
+      child: _RetornoCard(retorno: retorno, controller: controller),
+    ));
+  }
+  destino.add(const SizedBox(height: 5));
+}
+
+class _CabecalhoSecaoRetorno extends StatelessWidget {
+  const _CabecalhoSecaoRetorno({
+    required this.titulo,
+    required this.quantidade,
+    required this.icone,
+    required this.cor,
+  });
+
+  final String titulo;
+  final int quantidade;
+  final IconData icone;
+  final Color cor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icone, size: 18, color: cor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              titulo,
+              style: TextStyle(
+                color: cor,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            '$quantidade ${quantidade == 1 ? 'retorno' : 'retornos'}',
+            style: TextStyle(
+              color: cor,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

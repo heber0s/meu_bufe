@@ -102,6 +102,17 @@ class RetornosController extends GetxController {
     }).toList();
   }
 
+  Map<FiltroRetorno, List<RetornoOrcamento>> get retornosAgrupadosVisiveis {
+    final lista = retornosVisiveis;
+    return {
+      FiltroRetorno.atrasados:
+          lista.where((item) => item.atrasado).toList(),
+      FiltroRetorno.hoje: lista.where((item) => item.hoje).toList(),
+      FiltroRetorno.proximos:
+          lista.where((item) => !item.atrasado && !item.hoje).toList(),
+    };
+  }
+
   void atualizarBusca(String valor) => busca.value = valor;
 
   int get quantidadeAtrasados => retornos.where((item) => item.atrasado).length;
