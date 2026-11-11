@@ -69,22 +69,40 @@ class RetornosController extends GetxController {
   final AppDatabase db;
   final retornos = <RetornoOrcamento>[].obs;
   final filtro = FiltroRetorno.todos.obs;
+  final busca = ''.obs;
   final carregando = false.obs;
   final erro = RxnString();
 
   List<RetornoOrcamento> get retornosVisiveis {
-    final lista = retornos.toList();
-    switch (filtro.value) {
-      case FiltroRetorno.atrasados:
-        return lista.where((item) => item.atrasado).toList();
-      case FiltroRetorno.hoje:
-        return lista.where((item) => item.hoje).toList();
-      case FiltroRetorno.proximos:
-        return lista.where((item) => !item.atrasado && !item.hoje).toList();
-      case FiltroRetorno.todos:
-        return lista;
-    }
+    final porCategoria = retornos.where((item) {
+      switch (filtro.value) {
+        case FiltroRetorno.atrasados:
+          return item.atrasado;
+        case FiltroRetorno.hoje:
+          return item.hoje;
+        case FiltroRetorno.proximos:
+          return !item.atrasado && !item.hoje;
+        case FiltroRetorno.todos:
+          return true;
+      }
+    });
+
+    final termo = busca.value.trim().toLowerCase();
+    if (termo.isEmpty) return porCategoria.toList();
+
+    return porCategoria.where((item) {
+      final campos = [
+        item.cliente,
+        item.titulo,
+        item.resumo,
+        item.canal,
+        item.status,
+      ].join(' ').toLowerCase();
+      return campos.contains(termo);
+    }).toList();
   }
+
+  void atualizarBusca(String valor) => busca.value = valor;
 
   int get quantidadeAtrasados => retornos.where((item) => item.atrasado).length;
   int get quantidadeHoje => retornos.where((item) => item.hoje).length;

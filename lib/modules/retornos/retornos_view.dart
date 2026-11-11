@@ -47,6 +47,38 @@ class RetornosView extends GetView<RetornosController> {
                 ),
               ),
               const SizedBox(height: 10),
+              TextField(
+                onChanged: controller.atualizarBusca,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Buscar cliente, evento ou anotação',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  filled: true,
+                  fillColor: AppColors.superficie,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.texto.withValues(alpha: 0.10),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.roseGold.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               _FiltrosRetorno(controller: controller),
               const SizedBox(height: 14),
               if (controller.erro.value != null && lista.isEmpty)
