@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart' hide Column;
+import 'package:flutter/material.dart';
 import 'package:get/get.dart' hide Value;
 
+import '../../core/services/notificacao_service.dart';
 import '../../data/database/app_database.dart';
 import '../../routes/app_routes.dart';
 
@@ -141,6 +143,133 @@ class RetornosController extends GetxController {
   Future<void> abrirOrcamento(RetornoOrcamento retorno) async {
     await Get.toNamed(Routes.detalhe(retorno.orcamentoId));
     await carregar(silencioso: true);
+  }
+
+  Future<void> concluirRetorno(RetornoOrcamento retorno) async {
+    final confirmado = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Concluir retorno?'),
+        content: Text(
+          'O retorno de ${retorno.cliente} será marcado como concluído. '
+          'O registro atual será preservado no histórico.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Get.back(result: true),
+            icon: const Icon(Icons.check_rounded),
+            label: const Text('Concluir'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+    if (confirmado != true) return;
+
+    try {
+      await db.customStatement(
+        '''
+        INSERT INTO orcamento_acompanhamentos
+          (orcamento_id, contato_em, canal, resumo, proximo_retorno)
+        VALUES (?, ?, ?, ?, NULL)
+        ''',
+        [
+          retorno.orcamentoId,
+          DateTime.now().millisecondsSinceEpoch,
+          retorno.canal,
+          'Retorno concluído na Central de Retornos.',
+        ],
+      );
+
+      var notificacaoFalhou = false;
+      if (Get.isRegistered<NotificacaoService>()) {
+        try {
+          await Get.find<NotificacaoService>()
+              .cancelarRetorno(retorno.orcamentoId);
+        } catch (_) {
+          notificacaoFalhou = true;
+        }
+      }
+
+      await carregar(silencioso: true);
+      Get.snackbar(
+        'Retorno concluído',
+        notificacaoFalhou
+            ? 'O histórico foi preservado, mas não foi possível cancelar a notificação.'
+            : 'O contato foi registrado no histórico.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Erro ao concluir',
+        'Não foi possível registrar a conclusão do retorno.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> reagendarRetorno(
+    RetornoOrcamento retorno,
+    DateTime novoRetorno,
+  ) async {
+    if (!novoRetorno.isAfter(DateTime.now())) {
+      Get.snackbar(
+        'Data inválida',
+        'Escolha uma data e um horário futuros.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    try {
+      await db.customStatement(
+        '''
+        INSERT INTO orcamento_acompanhamentos
+          (orcamento_id, contato_em, canal, resumo, proximo_retorno)
+        VALUES (?, ?, ?, ?, ?)
+        ''',
+        [
+          retorno.orcamentoId,
+          DateTime.now().millisecondsSinceEpoch,
+          retorno.canal,
+          'Retorno reagendado na Central de Retornos.',
+          novoRetorno.millisecondsSinceEpoch,
+        ],
+      );
+
+      var notificacaoFalhou = false;
+      if (Get.isRegistered<NotificacaoService>()) {
+        try {
+          await Get.find<NotificacaoService>().agendarRetorno(
+            orcamentoId: retorno.orcamentoId,
+            titulo: retorno.titulo,
+            cliente: retorno.cliente,
+            resumo: 'Retorno reagendado.',
+            quando: novoRetorno,
+          );
+        } catch (_) {
+          notificacaoFalhou = true;
+        }
+      }
+
+      await carregar(silencioso: true);
+      Get.snackbar(
+        'Retorno reagendado',
+        notificacaoFalhou
+            ? 'A nova data foi salva no histórico, mas não foi possível atualizar a notificação.'
+            : 'Novo horário: ${formatarDataHora(novoRetorno)}.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (_) {
+      Get.snackbar(
+        'Erro ao reagendar',
+        'Não foi possível salvar a nova data do retorno.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 
   String formatarDataHora(DateTime data) {

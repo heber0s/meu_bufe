@@ -248,6 +248,38 @@ class _RetornoCard extends StatelessWidget {
   final RetornoOrcamento retorno;
   final RetornosController controller;
 
+  Future<void> _reagendar(BuildContext context) async {
+    final agora = DateTime.now();
+    final inicioDia = DateTime(agora.year, agora.month, agora.day);
+    final dataInicial = retorno.quando.isBefore(inicioDia)
+        ? inicioDia
+        : retorno.quando;
+    final data = await showDatePicker(
+      context: context,
+      initialDate: dataInicial,
+      firstDate: inicioDia,
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      helpText: 'Escolha a nova data do retorno',
+    );
+    if (data == null || !context.mounted) return;
+
+    final hora = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(retorno.quando),
+      helpText: 'Escolha o novo horário',
+    );
+    if (hora == null || !context.mounted) return;
+
+    final novoRetorno = DateTime(
+      data.year,
+      data.month,
+      data.day,
+      hora.hour,
+      hora.minute,
+    );
+    await controller.reagendarRetorno(retorno, novoRetorno);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cor = retorno.atrasado
@@ -366,6 +398,35 @@ class _RetornoCard extends StatelessWidget {
                     Icons.chevron_right_rounded,
                     size: 19,
                     color: AppColors.texto,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                alignment: WrapAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _reagendar(context),
+                    icon: const Icon(Icons.edit_calendar_outlined, size: 18),
+                    label: const Text('Reagendar'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.roseGold,
+                      side: BorderSide(
+                        color: AppColors.roseGold.withValues(alpha: 0.42),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () => controller.concluirRetorno(retorno),
+                    icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                    label: const Text('Concluir'),
+                    style: FilledButton.styleFrom(
+                      foregroundColor: AppColors.sage,
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
                 ],
               ),
