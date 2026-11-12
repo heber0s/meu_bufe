@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
-import 'package:flutter/material.dart' show Colors;
+import 'package:flutter/material.dart' show Colors, TextEditingController;
 import 'package:get/get.dart' hide Value;
 
 import '../../data/database/app_database.dart';
@@ -12,6 +12,7 @@ class ClientesController extends GetxController {
 
   final clientes = <Cliente>[].obs;
   final busca = ''.obs;
+  final TextEditingController buscaController = TextEditingController();
   final carregando = true.obs;
   final salvando = false.obs;
   final filtroOrcamentos = 'todos'.obs;
@@ -28,16 +29,29 @@ class ClientesController extends GetxController {
   int orcamentosDoCliente(int clienteId) =>
       orcamentosPorCliente[clienteId] ?? 0;
 
+  void atualizarBusca(String valor) {
+    busca.value = valor;
+  }
+
+  void limparBusca() {
+    buscaController.clear();
+    busca.value = '';
+  }
+
   /// Busca por contato e segmentação reativa por vínculo com orçamentos.
   List<Cliente> get clientesFiltrados {
-    final termo = _normalizar(busca.value);
+    final textoBusca = busca.value.trim();
+    final termo = _normalizar(textoBusca);
+    final termoTelefone = _normalizarTelefone(textoBusca);
+    final buscaPorTelefone = RegExp(r'\d').hasMatch(textoBusca);
     final filtro = filtroOrcamentos.value;
 
     return clientes.where((cliente) {
       final combinaBusca = termo.isEmpty ||
           _normalizar(cliente.nome).contains(termo) ||
-          _normalizar(cliente.telefone ?? '').contains(termo) ||
-          _normalizar(cliente.email ?? '').contains(termo);
+          _normalizar(cliente.email ?? '').contains(termo) ||
+          (buscaPorTelefone &&
+              _normalizarTelefone(cliente.telefone ?? '').contains(termoTelefone));
       final possuiOrcamento = orcamentosDoCliente(cliente.id) > 0;
       final combinaFiltro = filtro == 'todos' ||
           (filtro == 'com_orcamento' && possuiOrcamento) ||
@@ -93,6 +107,7 @@ class ClientesController extends GetxController {
   void onClose() {
     _subscription?.cancel();
     _orcamentosSubscription?.cancel();
+    buscaController.dispose();
     super.onClose();
   }
 

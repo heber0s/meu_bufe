@@ -59,22 +59,33 @@ class ClientesView extends GetView<ClientesController> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
-                child: TextField(
-                  onChanged: (valor) => controller.busca.value = valor,
-                  decoration: InputDecoration(
-                    hintText: 'Buscar cliente',
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: AppColors.roseGold,
+                child: Obx(() {
+                  final temBusca = controller.busca.value.isNotEmpty;
+                  return TextField(
+                    controller: controller.buscaController,
+                    onChanged: controller.atualizarBusca,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar cliente por nome, telefone ou e-mail',
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: AppColors.roseGold,
+                      ),
+                      suffixIcon: temBusca
+                          ? IconButton(
+                              tooltip: 'Limpar busca',
+                              onPressed: controller.limparBusca,
+                              icon: const Icon(Icons.close_rounded),
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
+                  );
+                }),
               ),
             ),
             SliverToBoxAdapter(
