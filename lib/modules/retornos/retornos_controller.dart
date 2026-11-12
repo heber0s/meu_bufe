@@ -14,6 +14,7 @@ class RetornoOrcamento {
     required this.orcamentoId,
     required this.titulo,
     required this.cliente,
+    this.telefone = '',
     required this.status,
     required this.resumo,
     required this.canal,
@@ -24,6 +25,7 @@ class RetornoOrcamento {
   final int orcamentoId;
   final String titulo;
   final String cliente;
+  final String telefone;
   final String status;
   final String resumo;
   final String canal;
@@ -49,6 +51,7 @@ class RetornoOrcamento {
       orcamentoId: row.read<int>('orcamento_id'),
       titulo: row.read<String>('titulo'),
       cliente: row.read<String>('cliente_nome'),
+      telefone: row.readNullable<String>('cliente_telefone') ?? '',
       status: row.read<String>('status'),
       resumo: row.read<String>('resumo'),
       canal: row.read<String>('canal'),
@@ -88,17 +91,26 @@ class RetornosController extends GetxController {
       }
     });
 
-    final termo = busca.value.trim().toLowerCase();
+    final termoOriginal = busca.value.trim();
+    final termo = _normalizarTexto(termoOriginal);
     if (termo.isEmpty) return porCategoria.toList();
 
+    final somenteTelefone = RegExp(r'^[\d\s()+.-]+$').hasMatch(termoOriginal);
+    final digitosBusca = termoOriginal.replaceAll(RegExp(r'\D'), '');
+
     return porCategoria.where((item) {
+      if (somenteTelefone && digitosBusca.isNotEmpty) {
+        final digitosTelefone = item.telefone.replaceAll(RegExp(r'\D'), '');
+        return digitosTelefone.contains(digitosBusca);
+      }
+
       final campos = [
         item.cliente,
         item.titulo,
         item.resumo,
         item.canal,
         item.status,
-      ].join(' ').toLowerCase();
+      ].map(_normalizarTexto).join(' ');
       return campos.contains(termo);
     }).toList();
   }
@@ -106,8 +118,7 @@ class RetornosController extends GetxController {
   Map<FiltroRetorno, List<RetornoOrcamento>> get retornosAgrupadosVisiveis {
     final lista = retornosVisiveis;
     return {
-      FiltroRetorno.atrasados:
-          lista.where((item) => item.atrasado).toList(),
+      FiltroRetorno.atrasados: lista.where((item) => item.atrasado).toList(),
       FiltroRetorno.hoje: lista.where((item) => item.hoje).toList(),
       FiltroRetorno.proximos:
           lista.where((item) => !item.atrasado && !item.hoje).toList(),
@@ -152,7 +163,8 @@ class RetornosController extends GetxController {
                atual.contato_em,
                o.titulo,
                o.status,
-               c.nome AS cliente_nome
+               c.nome AS cliente_nome,
+               c.telefone AS cliente_telefone
         FROM orcamento_acompanhamentos atual
         JOIN (
           SELECT orcamento_id, MAX(id) AS ultimo_id
@@ -317,5 +329,22 @@ class RetornosController extends GetxController {
     String dois(int valor) => valor.toString().padLeft(2, '0');
     return '${dois(data.day)}/${dois(data.month)}/${data.year} · '
         '${dois(data.hour)}:${dois(data.minute)}';
+  }
+
+  String _normalizarTexto(String texto) {
+    const substituicoes = <String, String>{
+      'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
+      'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+      'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+      'ó': 'o', 'ò': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
+      'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
+      'ç': 'c', 'ñ': 'n',
+    };
+
+    var normalizado = texto.toLowerCase();
+    for (final entrada in substituicoes.entries) {
+      normalizado = normalizado.replaceAll(entrada.key, entrada.value);
+    }
+    return normalizado;
   }
 }
