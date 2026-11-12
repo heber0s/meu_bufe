@@ -48,12 +48,20 @@ class RetornosView extends GetView<RetornosController> {
               ),
               const SizedBox(height: 10),
               TextField(
+                controller: controller.buscaController,
                 onChanged: controller.atualizarBusca,
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Buscar cliente, evento ou anotação',
                   prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: controller.busca.value.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Limpar busca',
+                          onPressed: controller.limparBusca,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
                   filled: true,
                   fillColor: AppColors.superficie,
                   contentPadding: const EdgeInsets.symmetric(
@@ -90,6 +98,17 @@ class RetornosView extends GetView<RetornosController> {
                     onPressed: () => controller.carregar(),
                     icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Tentar novamente'),
+                  ),
+                )
+              else if (lista.isEmpty && controller.busca.value.trim().isNotEmpty)
+                _EstadoVazio(
+                  icone: Icons.search_off_rounded,
+                  titulo: 'Nenhum retorno encontrado',
+                  descricao: 'Tente outro termo ou limpe a busca para ver os retornos desta categoria.',
+                  acao: TextButton.icon(
+                    onPressed: controller.limparBusca,
+                    icon: const Icon(Icons.close_rounded),
+                    label: const Text('Limpar busca'),
                   ),
                 )
               else if (lista.isEmpty)

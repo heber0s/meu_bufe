@@ -70,6 +70,7 @@ class RetornosController extends GetxController {
   final retornos = <RetornoOrcamento>[].obs;
   final filtro = FiltroRetorno.todos.obs;
   final busca = ''.obs;
+  final buscaController = TextEditingController();
   final carregando = false.obs;
   final erro = RxnString();
 
@@ -115,6 +116,11 @@ class RetornosController extends GetxController {
 
   void atualizarBusca(String valor) => busca.value = valor;
 
+  void limparBusca() {
+    buscaController.clear();
+    busca.value = '';
+  }
+
   int get quantidadeAtrasados => retornos.where((item) => item.atrasado).length;
   int get quantidadeHoje => retornos.where((item) => item.hoje).length;
   int get quantidadeProximos =>
@@ -124,6 +130,12 @@ class RetornosController extends GetxController {
   void onInit() {
     super.onInit();
     carregar();
+  }
+
+  @override
+  void onClose() {
+    buscaController.dispose();
+    super.onClose();
   }
 
   Future<void> carregar({bool silencioso = false}) async {
