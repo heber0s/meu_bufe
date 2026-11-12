@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -511,6 +512,52 @@ class _RetornoCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (retorno.telefone.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.phone_outlined,
+                      size: 16,
+                      color: AppColors.texto.withValues(alpha: 0.62),
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        retorno.telefone,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.texto.withValues(alpha: 0.78),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Copiar telefone',
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
+                      padding: EdgeInsets.zero,
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: retorno.telefone),
+                        );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Telefone copiado.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy_rounded, size: 17),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               Text(
                 retorno.resumo,
